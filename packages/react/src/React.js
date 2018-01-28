@@ -9,3 +9,5 @@ import assign from 'object-assign'
 import ReactVersion from 'shared/ReactVersion'
 import {REACT_FRAGMENT_TYPE, REACT_STRICT_MODE_TYPE} from 'shared/ReactSymbols';
 
+import {AsyncComponent, Component, PureComponent} from './ReactBaseClasses';
+
