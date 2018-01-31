@@ -17,3 +17,6 @@ export const REACT_FRAGMENT_TYPE = hasSymbol
 export const REACT_STRICT_MODE_TYPE = hasSymbol
   ? Symbol.for('react.strict_mode')
   : 0xeacc;
+export const REACT_ASYNC_MODE_TYPE = hasSymbol
+  ? Symbol.for('react.async_mode')
+  : 0xeacf;

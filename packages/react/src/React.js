@@ -5,9 +5,15 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import assign from 'object-assign'
-import ReactVersion from 'shared/ReactVersion'
-import {REACT_FRAGMENT_TYPE, REACT_STRICT_MODE_TYPE} from 'shared/ReactSymbols';
+import assign from 'object-assign';
+import ReactVersion from 'shared/ReactVersion';
+import {
+  REACT_FRAGMENT_TYPE,
+  REACT_STRICT_MODE_TYPE,
+  REACT_ASYNC_MODE_TYPE
+} from 'shared/ReactSymbols';
 
-import {AsyncComponent, Component, PureComponent} from './ReactBaseClasses';
+import {Component, PureComponent} from './ReactBaseClasses';
+import {forEach} from './ReactChildren';
+
 
