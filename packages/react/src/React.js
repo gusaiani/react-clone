@@ -14,6 +14,6 @@ import {
 } from 'shared/ReactSymbols';
 
 import {Component, PureComponent} from './ReactBaseClasses';
-import {forEach} from './ReactChildren';
+import {forEach, map} from './ReactChildren';
 
 

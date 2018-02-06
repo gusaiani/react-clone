@@ -26,6 +26,12 @@ function escape(key) {
   return '$' + escapedString;
 }
 
+const userProvidedKeyEscapeRegex = /\/+/g;
+function escapeUserProvidedKey(text) {
+  return ('' + text).replace(userProvidedKeyEscapeRegex, '$&/');
+}
+
+const POOL_SIZE = 10;
 const traverseContextPool = [];
 function getPooledTraverseContext(
   mapResult,
@@ -49,6 +55,17 @@ function getPooledTraverseContext(
       context: mapContext,
       count: 0,
     };
+  }
+}
+
+function releaseTraverseContext(traverseContext) {
+  traverseContext.result = null;
+  traverseContext.keyPrefix = null;
+  traverseContext.func = null;
+  traverseContext.context = null;
+  traverseContext.count = 0;
+  if (traverseContextPool.length < POOL_SIZE) {
+    traverseContextPool.push(traverseContext);
   }
 }
 
@@ -82,6 +99,7 @@ function traverseAllChildrenImpl(
       case 'string':
       case 'number':
         invokeCallback = true;
+        break;
       case 'object':
         switch (children.$$typeof) {
           case REACT_ELEMENT_TYPE:
@@ -99,6 +117,7 @@ function traverseAllChildrenImpl(
       // so that it's consistent if the number of children grows.
       nameSoFar === '' ? SEPARATOR + getComponentKey(children, 0) : nameSoFar,
     );
+    return 1;
   }
 }
 
@@ -107,16 +126,16 @@ function traverseAllChildrenImpl(
  * might also be specified through attributes:
  *
  * - `traverseAllChildren(this.props.children, ...)`
- * - `traverseAllChildren(this.props.leftPanelChildren), ...`
+ * - `traverseAllChildren(this.props.leftPanelChildren, ...)`
  *
- *   The `traverseContext` is an optional argument that is passed through the
- *   entire traversal. It can be used to store accumulations or anything else that
- *   the callback might find relevant.
+ * The `traverseContext` is an optional argument that is passed through the
+ * entire traversal. It can be used to store accumulations or anything else that
+ * the callback might find relevant.
  *
- *   @param {?*} children Children tree object.
- *   @param {!function} callback To invoke upon traversing each child.
- *   @param {?*} traverseContext Context for traversal.
- *   @return {!number} The number of children in this subtree.
+ * @param {?*} children Children tree object.
+ * @param {!function} callback To invoke upon traversing each child.
+ * @param {?*} traverseContext Context for traversal.
+ * @return {!number} The number of children in this subtree.
  */
 function traverseAllChildren(children, callback, traverseContext) {
   if (children == null) {
@@ -127,7 +146,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 }
 
 /**
- * Generates a key string that identifies a component within a set.
+ * Generate a key string that identifies a component within a set.
  *
  * @param {*} component A component that could contain a manual key.
  * @param {number} index Index that is used if a manual key is not provided.
@@ -146,6 +165,11 @@ function getComponentKey(component, index) {
   }
   // Implicit key determined by the index in the set
   return index.toString(36);
+}
+
+function forEachSingleChild(bookKeeping, child, name) {
+  const {func, context} = bookKeeping;
+  func.call(context, child, bookKeeping.count++);
 }
 
 /**
@@ -173,6 +197,44 @@ function forEachChildren(children, forEachFunc, forEachContext) {
   traverseAllChildren(children, forEachSingleChild, traverseContext);
 }
 
+function mapIntoWithKeyPrefixInternal(children, array, prefix, func, context) {
+  let escapedPrefix = '';
+  if (prefix != null) {
+    escapedPrefix = escapeUserProvidedKey(prefix) + '/';
+  }
+  const traverseContext = getPooledTraverseContext(
+    array,
+    escapedPrefix,
+    func,
+    context,
+  );
+  traverseAllChildren(children, mapSingleChildIntoContext, traverseContext);
+  releaseTraverseContext(traverseContext);
+}
+
+/**
+ * Maps children that are typically specified as `props.children`.
+ *
+ * See https://reactjs.org/docs/react-api.html#react.children.map
+ *
+ * The provided mapFunction(child, key, index) will be called for each
+ * leaf child.
+ *
+ * @param {?*} children Children tree container.
+ * @param {function(*, int)} func The map function.
+ * @param {*} context Context for mapFunction.
+ * @return {object} Object containing the ordered map of results.
+ */
+function mapChildren(children, func, context) {
+  if (children == null) {
+    return children;
+  }
+  const result = [];
+  mapIntoWithKeyPrefixInternal(children, result, null, func, context);
+  return result;
+}
+
 export {
   forEachChildren as forEach,
+  mapChildren as map,
 };
