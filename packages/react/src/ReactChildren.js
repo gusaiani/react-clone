@@ -5,7 +5,18 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+import emptyFunction from 'fbjs/lib/emptyFunction';
+import invariant from 'fbjs/lib/invariant';
+import warning from 'fbjs/lib/warning';
+import {
+  getIteratorFn,
+} from 'shared/ReactSymbols';
+
+import {isValidElement} from './ReactElement';
+import ReactDebugCurrentFrame from './ReactDebugCurrentFrame';
+
 const SEPARATOR = '.';
+const SUBSEPARATOR = ':';
 
 /**
  * Escape and wrap key so it is safe to use as a reactid
@@ -25,6 +36,13 @@ function escape(key) {
 
   return '$' + escapedString;
 }
+
+/**
+ * TODO: Test that a single child and an array with one item have the same key
+ * pattern.
+ */
+
+let didWarnAboutMaps = false;
 
 const userProvidedKeyEscapeRegex = /\/+/g;
 function escapeUserProvidedKey(text) {
@@ -119,6 +137,75 @@ function traverseAllChildrenImpl(
     );
     return 1;
   }
+
+  let child;
+  let nextName;
+  let subtreeCount = 0; // Count of children found in the current subtree.
+  const nextNamePrefix =
+    nameSoFar === '' ? SEPARATOR : nameSoFar + SUBSEPARATOR;
+
+  if (Array.isArray(children)) {
+    for (let i = 0; i < children.length; i++) {
+      child = children[i];
+      nextName = nextNamePrefix + getComponentKey(child, i);
+      subtreeCount += traverseAllChildrenImpl(
+        child,
+        nextName,
+        callback,
+        traverseContext,
+      );
+    }
+  } else {
+    const iteratorFn = getIteratorFn(children);
+    if (typeof iteratorFn === 'function') {
+      if (__DEV__) {
+        // Warn about using Maps as children
+        if (iteratorFn === children.entries) {
+          warning(
+            didWarnAboutMaps,
+            'Using Maps as children is unsupported and will likely yield ' +
+              'unexpected results. Convert it to a sequence/iterable of keyed ' +
+              'ReactElements instead.%s',
+            ReactDebugCurrentFrame.getStackAddendum(),
+          );
+          didWarnAboutMaps = true;
+        }
+      }
+
+      const iterator = iteratorFn.call(children);
+      let step;
+      let ii = 0;
+      while (!(step = iterator.next()).done) {
+        child = step.value;
+        nextName = nextNamePrefix + getComponentKey(child, ii++);
+        subtreeCount += traverseAllChildrenImpl(
+          child,
+          nextName,
+          callback,
+          traverseContext,
+        );
+      }
+    } else if (type === 'object') {
+      let addendum = '';
+      if (__DEV__) {
+        addendum =
+          ' If you meant to render a collection of children, use an array ' +
+          'instead.' +
+          ReactDebugCurrentFrame.getStackAddendum();
+      }
+      const childrenString = '' + children;
+      invariant(
+        false,
+        'Objects are not valid as a React child (found: %s).%s',
+        childrenString === '[object Object]'
+          ? 'object with keys {' + Object.keys(children).join(', ') + '}'
+          : childrenString,
+        addendum,
+      );
+    }
+  }
+
+  return subtreeCount;
 }
 
 /**
@@ -234,7 +321,62 @@ function mapChildren(children, func, context) {
   return result;
 }
 
+/**
+ * Count the number of children that are typically specified as
+ * `props.children`.
+ *
+ * See https://reactjs.org/docs/react-api.html#react.children.count
+ *
+ * @param {?*} children Children tree container.
+ * @return {number} The number of children.
+ */
+function countChildren(children, context) {
+  return traverseAllChildren(children, emptyFunction.thatReturnsNull, null);
+}
+
+/**
+ * Flatten a children object (typically specified as `props.children`) and
+ * return an array with appropriately re-keyed children.
+ *
+ * See https://reactjs.org/docs/react-api.html#react.children.toarray
+ */
+function toArray(children) {
+  const result = [];
+  mapIntoWithKeyPrefixInternal(
+    children,
+    result,
+    null,
+    emptyFunction.thatReturnsArgument,
+  );
+  return result;
+}
+
+/**
+ * Returns the first child in a collection of children and verifies that there
+ * is only one child in the collection.
+ *
+ * See https://reactjs.org/docs/react-api.html#react.children.only
+ *
+ * The current implementation of this function assumes that a single child gets
+ * passed without a wrapper, but the purpose of this helper function is to
+ * abstract away the particular structure of children.
+ *
+ * @param {?object} children Child collection structure.
+ * @return {ReactElement} The first and only `ReactElement` contained in the
+ * structure.
+ */
+function onlyChild(children) {
+  invariant(
+    isValidElement(children),
+    'React.Children.only expected to receive a single React element child.',
+  );
+  return children;
+}
+
 export {
   forEachChildren as forEach,
   mapChildren as map,
+  countChildren as count,
+  onlyChild as only,
+  toArray,
 };
