@@ -10,9 +10,11 @@ import invariant from 'fbjs/lib/invariant';
 import warning from 'fbjs/lib/warning';
 import {
   getIteratorFn,
+  REACT_ELEMENT_TYPE,
+  REACT_PORTAL_TYPE,
 } from 'shared/ReactSymbols';
 
-import {isValidElement} from './ReactElement';
+import {isValidElement, cloneAndReplaceKey} from './ReactElement';
 import ReactDebugCurrentFrame from './ReactDebugCurrentFrame';
 
 const SEPARATOR = '.';
@@ -282,6 +284,35 @@ function forEachChildren(children, forEachFunc, forEachContext) {
     forEachContext,
   );
   traverseAllChildren(children, forEachSingleChild, traverseContext);
+  releaseTraverseContext(traverseContext);
+}
+
+function mapSingleChildIntoContext(bookKeeping, child, childKey) {
+  const {result, keyPrefix, func, context} = bookKeeping;
+
+  let mappedChild = func.call(context, child, bookKeeping.count++);
+  if (Array.isArray(mappedChild)) {
+    mapIntoWithKeyPrefixInternal(
+      mappedChild,
+      result,
+      childKey,
+      emptyFunction.thatReturnsArgument,
+    );
+  } else if (mappedChild != null) {
+    if (isValidElement(mappedChild)) {
+      mappedChild = cloneAndReplaceKey(
+        mappedChild,
+        // Keep both the (mapped) and old keys if they differ, just as
+        // traverseAllChildren used to do for objects as children
+        keyPrefix +
+          (mappedChild.key && (!child || child.key !== mappedChild.key)
+            ? escapeUserProvidedKey(mappedChild.key) + '/'
+            : '') +
+          childKey,
+      );
+    }
+    result.push(mappedChild);
+  }
 }
 
 function mapIntoWithKeyPrefixInternal(children, array, prefix, func, context) {
