@@ -17,4 +17,6 @@ import {Component, PureComponent} from './ReactBaseClasses';
 import {createRef} from './ReactCreateRef';
 import {forEach, map, count, toArray, only} from './ReactChildren';
 import ReactCurrentOwner from './ReactCurrentOwner';
-
+import {
+  createElement,
+} from './ReactElement';

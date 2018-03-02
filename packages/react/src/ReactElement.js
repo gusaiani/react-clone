@@ -82,6 +82,41 @@ const ReactElement = function(type, key, ref, self, source, owner, props) {
   }
 
   return element;
+};
+
+/**
+ * Create and return a new ReactElement of the given type.
+ * See https://reactjs.org/docs/react-api.html#createelement
+ */
+export function createELement(type, config, children) {
+  let propName;
+
+  // Reserved names are extracted
+  const props = {}:
+
+  let key = null;
+  let ref = null;
+  let self = null;
+  let source = null;
+
+  if (config != null) {
+    if (hasValidRef(config)) {
+      ref = config.ref;
+    }
+    if (hasValidKey(config)) {
+      key = '' + config.key;
+    }
+
+    self = config.__self === undefined ? null : config.__self;
+    source = config.__source === undefined ? null : config.__source;
+    // Remaining properties are added to a new props object
+    for (propName in config) {
+      if (
+        hasOwnProperty.call(config, propName) &&
+        !
+      )
+    }
+  }
 }
 
 export function cloneAndReplaceKey(oldElement, newKey) {
