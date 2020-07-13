@@ -1,9 +1,13 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
+ *
+ * @flow
  */
+
+import type {ReactNodeList} from 'shared/ReactTypes';
 
 import emptyFunction from 'fbjs/lib/emptyFunction';
 import invariant from 'fbjs/lib/invariant';
@@ -45,6 +49,40 @@ function escape(key) {
  */
 
 let didWarnAboutMaps = false;
+
+function mapIntoArray(
+  children: ?ReactNodeList,
+  array: Array<React$Node>,
+  escapedPrefix: string,
+  nameSoFar: string,
+  callback: (?React$Node) => ?ReactNodeList,
+): number {
+  const type = typeof children;
+
+  if (type === 'undefined' || type === 'boolean') {
+    // All of the above are perceived as null.
+    children = null;
+  }
+
+  let invokeCallback = false;
+
+  if (children === null) {
+    invokeCallback = true;
+  } else {
+    switch (type) {
+      case 'string':
+      case 'number':
+        invokeCallback = true;
+        break;
+      case 'object':
+        switch ((children: any).$$typeof) {
+          case REACT_ELEMENT_TYPE:
+          case REACT_PORTAL_TYPE:
+            invokeCallback = true;
+        }
+    }
+  }
+}
 
 const userProvidedKeyEscapeRegex = /\/+/g;
 function escapeUserProvidedKey(text) {
@@ -330,12 +368,14 @@ function mapIntoWithKeyPrefixInternal(children, array, prefix, func, context) {
   releaseTraverseContext(traverseContext);
 }
 
+type MapFunc = (child: ?React$Node) => ?ReactNodeList;
+
 /**
  * Maps children that are typically specified as `props.children`.
  *
- * See https://reactjs.org/docs/react-api.html#react.children.map
+ * See https://reactjs.org/docs/react-api.html#reactchildrenmap
  *
- * The provided mapFunction(child, key, index) will be called for each
+ * The provided mapFunction(child, index) will be called for each
  * leaf child.
  *
  * @param {?*} children Children tree container.
@@ -343,12 +383,19 @@ function mapIntoWithKeyPrefixInternal(children, array, prefix, func, context) {
  * @param {*} context Context for mapFunction.
  * @return {object} Object containing the ordered map of results.
  */
-function mapChildren(children, func, context) {
+function mapChildren(
+  children: ?ReactNodeList,
+  func: MapFunc,
+  context: mixed,
+): ?Array<React$Node> {
   if (children == null) {
     return children;
   }
   const result = [];
-  mapIntoWithKeyPrefixInternal(children, result, null, func, context);
+  let count = 0;
+  mapIntoArray(children, result, '', '', function(child) {
+    return func.call(context, child, count++);
+  });
   return result;
 }
 

@@ -1,11 +1,12 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
+ *
+ * @flow
  */
 
-import assign from 'object-assign';
 import ReactVersion from 'shared/ReactVersion';
 import {
   REACT_FRAGMENT_TYPE,
@@ -16,7 +17,14 @@ import {
 import {Component, PureComponent} from './ReactBaseClasses';
 import {createRef} from './ReactCreateRef';
 import {forEach, map, count, toArray, only} from './ReactChildren';
-import ReactCurrentOwner from './ReactCurrentOwner';
 import {
   createElement,
 } from './ReactElement';
+
+const Children = {
+  map,
+};
+
+export {
+  Children,
+};
