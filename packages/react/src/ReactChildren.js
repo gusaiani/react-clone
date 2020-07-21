@@ -30,13 +30,13 @@ const SUBSEPARATOR = ':';
  * @param {string} key to be escaped.
  * @return {string} the escaped key.
  */
-function escape(key) {
+function escape(key: string): string {
   const escapeRegex = /[=:]/g;
   const escaperLookup = {
     '=': '=0',
     ':': '=2',
   };
-  const escapedString = ('' + key).replace(escapeRegex, function(match) {
+  const escapedString = key.replace(escapeRegex, function(match) {
     return escaperLookup[match];
   });
 
@@ -49,6 +49,24 @@ function escape(key) {
  */
 
 let didWarnAboutMaps = false;
+
+/**
+ * Generate a key string that identifies a element within a set.
+ *
+ * @param {*} element A element that could contain a manual key.
+ * @param {number} index Index that is used if a manual key is not provided.
+ * @return {string}
+ */
+function getElementKey(element: any, index: number): string {
+  // Do some typechecking here since we call this blindly. We want to ensure
+  // that we don't block potential future ES APIs.
+  if (typeof element === 'object' && element !== null && element.key != null) {
+    // Explicit key
+    return escape('' + element.key);
+  }
+  // Implicit key determined by the index in the set
+  return index.toString(36);
+}
 
 function mapIntoArray(
   children: ?ReactNodeList,
@@ -81,6 +99,15 @@ function mapIntoArray(
             invokeCallback = true;
         }
     }
+  }
+
+  if (invokeCallback) {
+    const child = children;
+    let mappedChild = callback(child);
+    // If it's the only child, treat the name as if it was wrapped in an array
+    // so that it's consistent if the number of children grows:
+    const childKey =
+      nameSoFar === '' ? SEPARATOR + getElementKey(child, 0) : nameSoFar;
   }
 }
 
