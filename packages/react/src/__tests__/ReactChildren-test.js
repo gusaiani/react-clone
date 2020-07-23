@@ -27,5 +27,45 @@ describe('ReactChildren', () => {
     });
 
     const simpleKid = <span key="simple" />;
-  })
+
+    // First pass children into a component to fully simulate what happens when
+    // using structures that arrive from transforms.
+
+    const instance = <div>{simpleKid}</div>;
+    React.Children.forEach(instance.props.children, callback, context);
+    expect(callback).toHaveBeenCalledWith(simpleKid, 0);
+    callback.mockClear();
+    const mappedChildren = React.Children.map(
+      instance.props.children,
+      callback,
+      context,
+    );
+    expect(callback).toHaveBeenCalledWith(simpleKid, 0);
+    expect(mappedChildren[0]).toEqual(<span key=".$simple" />);
+  });
+
+  it('should support Portal components', () => {
+    const context = {};
+    const callback = jest.fn().mockImplementation(function(kid, index) {
+      expect(this).toBe(context);
+      return kid;
+    });
+    const ReactDOM = require('react-dom');
+    const portalContainer = document.createElement('div');
+
+    const simpleChild = <span key="simple" />;
+    const reactPortal = ReactDOM.createPortal(simpleChild, portalContainer);
+
+    const parentInstance = <div>{reactPortal}</div>;
+    React.Children.forEach(parentInstance.props.children, callback, context);
+    expect(callback).toHaveBeenCalledWith(reactPortal, 0);
+    callback.mockClear();
+    const mappedChildren = React.Children.map(
+      parentInstance.props.children,
+      callback,
+      context,
+    );
+    expect(callback).toHaveBeenCalledWith(reactPortal, 0);
+    expect(mappedChildren[0]).toEqual(reactPortal);
+  });
 })
