@@ -108,7 +108,12 @@ function mapIntoArray(
     // so that it's consistent if the number of children grows:
     const childKey =
       nameSoFar === '' ? SEPARATOR + getElementKey(child, 0) : nameSoFar;
-    if (Array.isArray(mappedChild)) {}
+    if (Array.isArray(mappedChild)) {
+      let escapedChildKey = '';
+      if (childKey != null) {
+        escapedChildKey = escapeUserProvidedKey(childKey) + '/';
+      }
+    }
   }
 }
 
