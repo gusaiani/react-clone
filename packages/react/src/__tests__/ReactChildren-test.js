@@ -583,4 +583,77 @@ describe('ReactChildren', () => {
     expect(mappedChildren[2]).toEqual(<span key=".3" />);
     expect(mappedChildren[3]).toEqual(<div key=".$keyFour" />);
   });
+
+  it('should be called for each child in nested structure', () => {
+    const zero = <div key="keyZero" />;
+    const one = null;
+    const two = <div key="keyTwo" />;
+    const three = null;
+    const four = <div key="keyFour" />;
+    const five = <div key="keyFive" />;
+
+    const zeroMapped = <div key="giraffe" />; // Key should be overridden
+    const twoMapped = <div />; // Key should be added even if not supplied!
+    const fourMapped = <div key="keyFour" />;
+    const fiveMapped = <div />;
+
+    const callback = jest.fn().mockImplementation(function(kid) {
+      switch (kid) {
+        case zero:
+          return zeroMapped;
+        case two:
+          return twoMapped;
+        case four:
+          return fourMapped;
+        case five:
+          return fiveMapped;
+        default:
+          return kid;
+      }
+    });
+
+    const frag = [[zero, one, two], [three, four], five];
+    const instance = <div>{[frag]}</div>;
+
+    React.Children.forEach(instance.props.children, callback);
+    expect(callback).toHaveBeenCalledTimes(6);
+    expect(callback).toHaveBeenCalledWith(zero, 0);
+    expect(callback).toHaveBeenCalledWith(one, 1);
+    expect(callback).toHaveBeenCalledWith(two, 2);
+    expect(callback).toHaveBeenCalledWith(three, 3);
+    expect(callback).toHaveBeenCalledWith(four, 4);
+    expect(callback).toHaveBeenCalledWith(five, 5);
+    callback.mockClear();
+
+    const mappedChildren = React.Children.map(
+      instance.props.children,
+      callback,
+    );
+    expect(callback).toHaveBeenCalledTimes(6);
+    expect(callback).toHaveBeenCalledWith(zero, 0);
+    expect(callback).toHaveBeenCalledWith(one, 1);
+    expect(callback).toHaveBeenCalledWith(two, 2);
+    expect(callback).toHaveBeenCalledWith(three, 3);
+    expect(callback).toHaveBeenCalledWith(four, 4);
+    expect(callback).toHaveBeenCalledWith(five, 5);
+
+    expect(React.Children.count(mappedChildren)).toBe(4);
+    // Keys default to indices.
+    expect([
+      mappedChildren[0].key,
+      mappedChildren[1].key,
+      mappedChildren[2].key,
+      mappedChildren[3].key,
+    ]).toEqual([
+      'giraffe/.0:0:$keyZero',
+      '.0:0:$keyTwo',
+      '.0:1:$keyFour',
+      '.0:$keyFive',
+    ]);
+
+    expect(mappedChildren[0]).toEqual(<div key="giraffe/.0:0:$keyZero" />);
+    expect(mappedChildren[1]).toEqual(<div key=".0:0:$keyTwo" />);
+    expect(mappedChildren[2]).toEqual(<div key=".0:1:$keyFour" />);
+    expect(mappedChildren[3]).toEqual(<div key=".0:$keyFive" />);
+  });
 });
