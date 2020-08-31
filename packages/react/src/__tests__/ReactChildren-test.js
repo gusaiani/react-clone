@@ -656,4 +656,85 @@ describe('ReactChildren', () => {
     expect(mappedChildren[2]).toEqual(<div key=".0:1:$keyFour" />);
     expect(mappedChildren[3]).toEqual(<div key=".0:$keyFive" />);
   });
+
+  it('should retain key across two mappings', () => {
+    const zeroForceKey = <div key="keyZero" />;
+    const oneForceKey = <div key="keyOne" />;
+
+    // Key should be joined to object key
+    const zeroForceKeyMapped = <div key="giraffe" />;
+    // Key should be added even if we don't supply it!
+    const oneForceKeyMapped = <div />;
+
+    const mapFn = function(kid, index) {
+      return index === 0 ? zeroForceKeyMapped : oneForceKeyMapped;
+    };
+
+    const forcedKeys = (
+      <div>
+        {zeroForceKey}
+        {oneForceKey}
+      </div>
+    );
+
+    const expectedForcedKeys = ['giraffe/.$keyZero', '.$keyOne'];
+    const mappedChildrenForcedKeys = React.Children.map(
+      forcedKeys.props.children,
+      mapFn,
+    );
+    const mappedForcedKeys = mappedChildrenForcedKeys.map(c => c.key);
+    expect(mappedForcedKeys).toEqual(expectedForcedKeys);
+
+    const expectedRemappedForcedKeys = [
+      'giraffe/.$giraffe/.$keyZero',
+      '.$.$keyOne',
+    ];
+    const remappedChildrenForcedKeys = React.Children.map(
+      mappedChildrenForcedKeys,
+      mapFn,
+    );
+    expect(remappedChildrenForcedKeys.map(c => c.key)).toEqual(
+      expectedRemappedForcedKeys,
+    );
+  });
+
+  it('should not throw if key provided is a dupe with array key', () => {
+    const zero = <div />;
+    const one = <div key="0" />;
+
+    const mapFn = function() {
+      return null;
+    };
+
+    const instance = (
+      <div>
+        {zero}
+        {one}
+      </div>
+    );
+
+    expect(function() {
+      React.Children.map(instance.props.children, mapFn);
+    }).not.toThrow();
+  });
+
+  it('should use the same key for a cloned element', () => {
+    const instance = (
+      <div>
+        <div />
+      </div>
+    );
+
+    const mapped = React.Children.map(
+      instance.props.children,
+      element => element,
+    );
+
+    const mappedWithClone = React.Children.map(
+      instance.props.children,
+      element => React.cloneElement(element),
+    );
+
+    expect(mapped[0].key).toBe(mappedWithClone[0].key);
+  });
 });
