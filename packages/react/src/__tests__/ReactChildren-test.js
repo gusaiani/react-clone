@@ -737,4 +737,76 @@ describe('ReactChildren', () => {
 
     expect(mapped[0].key).toBe(mappedWithClone[0].key);
   });
+
+  it('should use the same key for a cloned element with key', () => {
+    const instance = (
+      <div>
+        <div key="unique" />
+      </div>
+    );
+
+    const mapped = React.Children.map(
+      instance.props.children,
+      element => element,
+    );
+
+    const mappedWithClone = React.Children.map(
+      instance.props.children,
+      element => React.cloneElement(element, {key: 'unique'}),
+    );
+
+    expect(mapped[0].key).toBe(mappedWithClone[0].key);
+  });
+
+  it('should return 0 for null children', () => {
+    const numberOfChildren = React.Children.count(null);
+    expect(numberOfChildren).toBe(0);
+  });
+
+  it('should return 0 for undefined children', () => {
+    const numberOfChildren = React.Children.count(undefined);
+    expect(numberOfChildren).toBe(0);
+  });
+
+  it('should return 1 for single child', () => {
+    const simpleKid = <span key="simple" />;
+    const instance = <div>{simpleKid}</div>;
+    const numberOfChildren = React.Children.count(instance.props.children);
+    expect(numberOfChildren).toBe(1);
+  });
+
+  it('should count the number of children in flat structure', () => {
+    const zero = <div key="keyZero" />;
+    const one = null;
+    const two = <div key="keyTwo" />;
+    const three = null;
+    const four = <div key="keyFour" />;
+
+    const instance = (
+      <div>
+        {zero}
+        {one}
+        {two}
+        {three}
+        {four}
+      </div>
+    );
+    const numberOfChildren = React.Children.count(instance.props.children);
+    expect(numberOfChildren).toBe(5);
+  });
+
+  it('should count the number of children in nested structure', () => {
+    const zero = <div key="keyZero" />;
+    const one = null;
+    const two = <div key="keyTwo" />;
+    const three = null;
+    const four = <div key="keyFour" />;
+    const five = <div key="keyFive" />;
+
+    const instance = (
+      <div>{[[[zero, one, two], [three, four], five], null]}</div>
+    );
+    const numberOfChildren = React.Children.count(instance.props.children);
+    expect(numberOfChildren).toBe(7);
+  });
 });
