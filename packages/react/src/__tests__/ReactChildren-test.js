@@ -809,4 +809,84 @@ describe('ReactChildren', () => {
     const numberOfChildren = React.Children.count(instance.props.children);
     expect(numberOfChildren).toBe(7);
   });
+
+  it('should flatten children to an array', () => {
+    expect(React.Children.toArray(undefined)).toEqual([]);
+    expect(React.Children.toArray(null)).toEqual([]);
+
+    expect(React.Children.toArray(<div />).length).toBe(1);
+    expect(React.Children.toArray([<div />]).length).toBe(1);
+    expect(React.Children.toArray(<div />)[0].key).toBe(
+      React.Children.toArray([<div />])[0].key,
+    );
+
+    const flattened = React.Children.toArray([
+      [<div key="apple" />, <div key="banana" />, <div key="camel" />],
+      [<div key="banana" />, <div key="camel" />, <div key="deli" />],
+    ]);
+    expect(flattened.length).toBe(6);
+    expect(flattened[1].key).toContain('banana');
+    expect(flattened[3].key).toContain('banana');
+    expect(flattened[1].key).not.toBe(flattened[3].key);
+
+    const reversed = React.Children.toArray([
+      [<div key="camel" />, <div key="banana" />, <div key="apple" />],
+      [<div key="deli" />, <div key="camel" />, <div key="banana" />],
+    ]);
+    expect(flattened[0].key).toBe(reversed[2].key);
+    expect(flattened[1].key).toBe(reversed[1].key);
+    expect(flattened[2].key).toBe(reversed[0].key);
+    expect(flattened[3].key).toBe(reversed[5].key);
+    expect(flattened[4].key).toBe(reversed[4].key);
+    expect(flattened[5].key).toBe(reversed[3].key);
+
+    // null/undefined/bool are all omitted
+    expect(React.Children.toArray([1, 'two', null, undefined, true])).toEqual([
+      1,
+      'two',
+    ]);
+  });
+
+  it('should escape keys', () => {
+    const zero = <div key="1" />;
+    const one = <div key="1=::=2" />;
+    const instance = (
+      <div>
+        {zero}
+        {one}
+      </div>
+    );
+    const mappedChildren = React.Children.map(
+      instance.props.children,
+      kid => kid,
+    );
+    expect(mappedChildren).toEqual([
+      <div key=".$1" />,
+      <div key=".$1=0=2=2=02" />,
+    ]);
+  });
+
+  it('should combine keys when map returns an array', () => {
+    const instance = (
+      <div>
+        <div key="a" />
+        {false}
+        <div key="b" />
+        <p />
+      </div>
+    );
+    const mappedChildren = React.Children.map(
+      instance.props.children,
+      // Try a few things: keyed, unkeyed, hole, and a cloned element
+      kid => [
+        <span key="x" />,
+        null,
+        <span key="y" />,
+        kid,
+        kid && React.cloneElement(kid, {key: 'z'}),
+        <hr />,
+      ],
+    );
+    expect(mappedChildren.length).toBe(18);
+  });
 });
