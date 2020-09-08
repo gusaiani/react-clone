@@ -9,9 +9,7 @@
 
 import type {ReactNodeList} from 'shared/ReactTypes';
 
-import emptyFunction from 'fbjs/lib/emptyFunction';
-import invariant from 'fbjs/lib/invariant';
-import warning from 'fbjs/lib/warning';
+import invariant from 'shared/invariant';
 import {
   getIteratorFn,
   REACT_ELEMENT_TYPE,
@@ -19,7 +17,6 @@ import {
 } from 'shared/ReactSymbols';
 
 import {isValidElement, cloneAndReplaceKey} from './ReactElement';
-import ReactDebugCurrentFrame from './ReactDebugCurrentFrame';
 
 const SEPARATOR = '.';
 const SUBSEPARATOR = ':';
@@ -49,6 +46,11 @@ function escape(key: string): string {
  */
 
 let didWarnAboutMaps = false;
+
+const userProvidedKeyEscapeRegex = /\/+/g;
+function escapeUserProvidedKey(text: string): string {
+  return text.replace(userProvidedKeyEscapeRegex, '$&/');
+}
 
 /**
  * Generate a key string that identifies a element within a set.
@@ -113,101 +115,24 @@ function mapIntoArray(
       if (childKey != null) {
         escapedChildKey = escapeUserProvidedKey(childKey) + '/';
       }
+      mapIntoArray(mappedChild, array, escapedChildKey, '', c => c);
+    } else if (mappedChild != null) {
+      if (isValidElement(mappedChild)) {
+        mappedChild = cloneAndReplaceKey(
+          mappedChild,
+          // Keep both the (mapped) and old keys if they differ, just as
+          // traverseAllChildren used to do for objects as children
+          escapedPrefix +
+            // $FlowFixMe Flow incorrectly thinks React.Portal doesn't have a key
+            (mappedChild.key && (!child || child.key !== mappedChild.key)
+              ? // $FlowFixMe Flow incorrectly thinks existing element's key can be a number
+                escapeUserProvidedKey('' + mappedChild.key) + '/'
+              : '') +
+            childKey,
+        );
+      }
+      array.push(mappedChild);
     }
-  }
-}
-
-const userProvidedKeyEscapeRegex = /\/+/g;
-function escapeUserProvidedKey(text) {
-  return ('' + text).replace(userProvidedKeyEscapeRegex, '$&/');
-}
-
-const POOL_SIZE = 10;
-const traverseContextPool = [];
-function getPooledTraverseContext(
-  mapResult,
-  keyPrefix,
-  mapFunction,
-  mapContext,
-) {
-  if (traverseContextPool.length) {
-    const traverseContext = traverseContextPool.pop();
-    traverseContext.result = mapResult;
-    traverseContext.keyPrefix = keyPrefix;
-    traverseContext.func = mapFunction;
-    traverseContext.context = mapContext;
-    traverseContext.count = 0;
-    return traverseContext;
-  } else {
-    return {
-      result: mapResult,
-      keyPrefix: keyPrefix,
-      func: mapFunction,
-      context: mapContext,
-      count: 0,
-    };
-  }
-}
-
-function releaseTraverseContext(traverseContext) {
-  traverseContext.result = null;
-  traverseContext.keyPrefix = null;
-  traverseContext.func = null;
-  traverseContext.context = null;
-  traverseContext.count = 0;
-  if (traverseContextPool.length < POOL_SIZE) {
-    traverseContextPool.push(traverseContext);
-  }
-}
-
-/**
- * @param {?*} children Children tree container.
- * @param {!string} nameSoFar Name of the key path so far.
- * @param {!function} callback Callback to invoke with each child found.
- * @param {?*} traverseContext Used to pass information throughout the traversal
- * process.
- * @return {!number} The number of children in this subtree.
- */
-function traverseAllChildrenImpl(
-  children,
-  nameSoFar,
-  callback,
-  traverseContext,
-) {
-  const type = typeof children;
-
-  if (type === 'undefined' || type === 'boolean') {
-    // All of the above are perceived as null.
-    children = null;
-  }
-
-  let invokeCallback = false;
-
-  if (children === null) {
-    invokeCallback = true;
-  } else {
-    switch (type) {
-      case 'string':
-      case 'number':
-        invokeCallback = true;
-        break;
-      case 'object':
-        switch (children.$$typeof) {
-          case REACT_ELEMENT_TYPE:
-          case REACT_PORTAL_TYPE:
-            invokeCallback = true;
-        }
-    }
-  }
-
-  if (invokeCallback) {
-    callback(
-      traverseContext,
-      children,
-      // If it's the only child, treat the name as if it was wrapped in an array
-      // so that it's consistent if the number of children grows.
-      nameSoFar === '' ? SEPARATOR + getComponentKey(children, 0) : nameSoFar,
-    );
     return 1;
   }
 
@@ -220,185 +145,64 @@ function traverseAllChildrenImpl(
   if (Array.isArray(children)) {
     for (let i = 0; i < children.length; i++) {
       child = children[i];
-      nextName = nextNamePrefix + getComponentKey(child, i);
-      subtreeCount += traverseAllChildrenImpl(
+      nextName = nextNamePrefix + getElementKey(child, i);
+      subtreeCount += mapIntoArray(
         child,
+        array,
+        escapedPrefix,
         nextName,
         callback,
-        traverseContext,
       );
     }
   } else {
     const iteratorFn = getIteratorFn(children);
     if (typeof iteratorFn === 'function') {
+      const iterableChildren: Iterable<React$Node> & {
+        entries: any,
+      } = (children: any);
+
       if (__DEV__) {
         // Warn about using Maps as children
-        if (iteratorFn === children.entries) {
-          warning(
-            didWarnAboutMaps,
-            'Using Maps as children is unsupported and will likely yield ' +
-              'unexpected results. Convert it to a sequence/iterable of keyed ' +
-              'ReactElements instead.%s',
-            ReactDebugCurrentFrame.getStackAddendum(),
-          );
+        if (iteratorFn === iterableChildren.entries) {
+          if (!didWarnAboutMaps) {
+            console.warn(
+              'Using Maps as children is not supported. ' +
+                'Use an array of keyed ReactElements instead.',
+            );
+          }
           didWarnAboutMaps = true;
         }
       }
 
-      const iterator = iteratorFn.call(children);
+      const iterator = iteratorFn.call(iterableChildren);
       let step;
       let ii = 0;
       while (!(step = iterator.next()).done) {
         child = step.value;
-        nextName = nextNamePrefix + getComponentKey(child, ii++);
-        subtreeCount += traverseAllChildrenImpl(
+        nextName = nextNamePrefix + getElementKey(child, ii++);
+        subtreeCount += mapIntoArray(
           child,
+          array,
+          escapedPrefix,
           nextName,
           callback,
-          traverseContext,
         );
       }
     } else if (type === 'object') {
-      let addendum = '';
-      if (__DEV__) {
-        addendum =
-          ' If you meant to render a collection of children, use an array ' +
-          'instead.' +
-          ReactDebugCurrentFrame.getStackAddendum();
-      }
-      const childrenString = '' + children;
+      const childrenString = '' + (children: any);
       invariant(
         false,
-        'Objects are not valid as a React child (found: %s).%s',
+        'Objects are not valid as a React child (found: %s). ' +
+          'If you meant to render a collection of children, use an array ' +
+          'instead.',
         childrenString === '[object Object]'
-          ? 'object with keys {' + Object.keys(children).join(', ') + '}'
+          ? 'object with keys {' + Object.keys((children: any)).join(', ') + '}'
           : childrenString,
-        addendum,
       );
     }
   }
 
   return subtreeCount;
-}
-
-/**
- * Traverses children that are typically specified as `props.children`, but
- * might also be specified through attributes:
- *
- * - `traverseAllChildren(this.props.children, ...)`
- * - `traverseAllChildren(this.props.leftPanelChildren, ...)`
- *
- * The `traverseContext` is an optional argument that is passed through the
- * entire traversal. It can be used to store accumulations or anything else that
- * the callback might find relevant.
- *
- * @param {?*} children Children tree object.
- * @param {!function} callback To invoke upon traversing each child.
- * @param {?*} traverseContext Context for traversal.
- * @return {!number} The number of children in this subtree.
- */
-function traverseAllChildren(children, callback, traverseContext) {
-  if (children == null) {
-    return 0;
-  }
-
-  return traverseAllChildrenImpl(children, '', callback, traverseContext);
-}
-
-/**
- * Generate a key string that identifies a component within a set.
- *
- * @param {*} component A component that could contain a manual key.
- * @param {number} index Index that is used if a manual key is not provided.
- * @return {string}
- */
-function getComponentKey(component, index) {
-  // Do some typechecking here since we call this blindly. We want to ensure
-  // that we don't block potential future ES APIs.
-  if (
-    typeof component === 'object' &&
-    component !== null &&
-    component.key != null
-  ) {
-    // Explicit key
-    return escape(component.key);
-  }
-  // Implicit key determined by the index in the set
-  return index.toString(36);
-}
-
-function forEachSingleChild(bookKeeping, child, name) {
-  const {func, context} = bookKeeping;
-  func.call(context, child, bookKeeping.count++);
-}
-
-/**
- * Iterates through children that are typically specified as `props.children`.
- *
- * See https://reactjs.org/docs/react-api.html#react.children.foreach
- *
- * The provided forEachFunc(child, index) will be called for each
- * leaf child.
- *
- * @param {?*} children Children tree container.
- * @param {function(*, int)} forEachFunc
- * @param {*} forEachContext Context for forEachContext.
- */
-function forEachChildren(children, forEachFunc, forEachContext) {
-  if (children == null) {
-    return children;
-  }
-  const traverseContext = getPooledTraverseContext(
-    null,
-    null,
-    forEachFunc,
-    forEachContext,
-  );
-  traverseAllChildren(children, forEachSingleChild, traverseContext);
-  releaseTraverseContext(traverseContext);
-}
-
-function mapSingleChildIntoContext(bookKeeping, child, childKey) {
-  const {result, keyPrefix, func, context} = bookKeeping;
-
-  let mappedChild = func.call(context, child, bookKeeping.count++);
-  if (Array.isArray(mappedChild)) {
-    mapIntoWithKeyPrefixInternal(
-      mappedChild,
-      result,
-      childKey,
-      emptyFunction.thatReturnsArgument,
-    );
-  } else if (mappedChild != null) {
-    if (isValidElement(mappedChild)) {
-      mappedChild = cloneAndReplaceKey(
-        mappedChild,
-        // Keep both the (mapped) and old keys if they differ, just as
-        // traverseAllChildren used to do for objects as children
-        keyPrefix +
-          (mappedChild.key && (!child || child.key !== mappedChild.key)
-            ? escapeUserProvidedKey(mappedChild.key) + '/'
-            : '') +
-          childKey,
-      );
-    }
-    result.push(mappedChild);
-  }
-}
-
-function mapIntoWithKeyPrefixInternal(children, array, prefix, func, context) {
-  let escapedPrefix = '';
-  if (prefix != null) {
-    escapedPrefix = escapeUserProvidedKey(prefix) + '/';
-  }
-  const traverseContext = getPooledTraverseContext(
-    array,
-    escapedPrefix,
-    func,
-    context,
-  );
-  traverseAllChildren(children, mapSingleChildIntoContext, traverseContext);
-  releaseTraverseContext(traverseContext);
 }
 
 type MapFunc = (child: ?React$Node) => ?ReactNodeList;
@@ -436,37 +240,64 @@ function mapChildren(
  * Count the number of children that are typically specified as
  * `props.children`.
  *
- * See https://reactjs.org/docs/react-api.html#react.children.count
+ * See https://reactjs.org/docs/react-api.html#reactchildrencount
  *
  * @param {?*} children Children tree container.
  * @return {number} The number of children.
  */
-function countChildren(children, context) {
-  return traverseAllChildren(children, emptyFunction.thatReturnsNull, null);
+function countChildren(children: ?ReactNodeList): number {
+  let n = 0;
+  mapChildren(children, () => {
+    n++;
+    // Don't return anything
+  });
+  return n;
+}
+
+type ForEachFunc = (child: ?React$Node) => void;
+
+/**
+ * Iterates through children that are typically specified as `props.children`.
+ *
+ * See https://reactjs.org/docs/react-api.html#reactchildrenforeach
+ *
+ * The provided forEachFunc(child, index) will be called for each
+ * leaf child.
+ *
+ * @param {?*} children Children tree container.
+ * @param {function(*, int)} forEachFunc
+ * @param {*} forEachContext Context for forEachContext.
+ */
+function forEachChildren(
+  children: ?ReactNodeList,
+  forEachFunc: ForEachFunc,
+  forEachContext: mixed,
+): void {
+  mapChildren(
+    children,
+    function() {
+      forEachFunc.apply(this, arguments);
+      // Don't return anything.
+    },
+    forEachContext,
+  );
 }
 
 /**
  * Flatten a children object (typically specified as `props.children`) and
  * return an array with appropriately re-keyed children.
  *
- * See https://reactjs.org/docs/react-api.html#react.children.toarray
+ * See https://reactjs.org/docs/react-api.html#reactchildrentoarray
  */
-function toArray(children) {
-  const result = [];
-  mapIntoWithKeyPrefixInternal(
-    children,
-    result,
-    null,
-    emptyFunction.thatReturnsArgument,
-  );
-  return result;
+function toArray(children: ?ReactNodeList): Array<React$Node> {
+  return mapChildren(children, child => child) || [];
 }
 
 /**
  * Returns the first child in a collection of children and verifies that there
  * is only one child in the collection.
  *
- * See https://reactjs.org/docs/react-api.html#react.children.only
+ * See https://reactjs.org/docs/react-api.html#reactchildrenonly
  *
  * The current implementation of this function assumes that a single child gets
  * passed without a wrapper, but the purpose of this helper function is to
@@ -476,7 +307,7 @@ function toArray(children) {
  * @return {ReactElement} The first and only `ReactElement` contained in the
  * structure.
  */
-function onlyChild(children) {
+function onlyChild<T>(children: T): T {
   invariant(
     isValidElement(children),
     'React.Children.only expected to receive a single React element child.',
