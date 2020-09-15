@@ -109,6 +109,44 @@ export function createContext<T>(
           context._threadCount = _threadCount;
         },
       },
-    })
+      Consumer: {
+        get() {
+          if (!hasWarnedAboutUsingNestedContextConsumers) {
+            hasWarnedAboutUsingNestedContextConsumers = true;
+            console.error(
+              'Rendering <Context.Consumer.Consumer> is not supported and will be removed in ' +
+                'a future major release. Did you mean to render <Context.Consumer> instead?',
+            );
+          }
+          return context.Consumer;
+        },
+      },
+      displayName: {
+        get() {
+          return context.displayName;
+        },
+        set(displayName) {
+          if (!hasWarnedAboutDisplayNameOnConsumer) {
+            console.warn(
+              'Setting `displayName` on Context.Consumer has no effect. ' +
+                "You should set it directly on the context with Context.displayName = '%s'.",
+              displayName,
+            );
+            hasWarnedAboutDisplayNameOnConsumer = true;
+          }
+        },
+      },
+    });
+    // $FlowFixMe: Flow complains about missing properties because it doesn't understand defineProperty
+    context.Consumer = Consumer;
+  } else {
+    context.Consumer = context;
   }
+
+  if (__DEV__) {
+    context._currentRenderer = null;
+    context._currentRenderer2 = null;
+  }
+
+  return context;
 }
