@@ -38,4 +38,5 @@ export type Interaction = {
 // We can't use export * from in Flow for some reason.
 export {
   Children,
+  createRef,
 } from './src/React';
