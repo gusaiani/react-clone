@@ -13,6 +13,19 @@ export type RefObject = {|
   value: any,
 |};
 
+export type ReactProvider<T> = {
+  $$typeof: Symbol | number,
+  type: ReactProviderType<T>,
+  key: null | string,
+  ref: null,
+  props: {
+    value: T,
+    children?: ReactNodeList,
+    ...
+  },
+  ...
+};
+
 export type ReactProviderType<T> = {
   $$typeof: Symbol | number,
   context: ReactContext<T>,
