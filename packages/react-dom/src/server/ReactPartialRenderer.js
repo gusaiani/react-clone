@@ -17,12 +17,17 @@ import invariant from 'shared/invariant';
 import getComponentName from 'shared/getComponentName';
 
 import {
-  REACT_FRAGMENT_TYPE
-} from 'shared/ReactSymbols'
+  REACT_FRAGMENT_TYPE,
+} from 'shared/ReactSymbols';
+
+import {allocThreadID} from './ReactThreadIDAllocator';
+import {
+  Namespaces,
+} from '../shared/DOMNamespaces';
 
 export type ServerOptions = {
   identifierPrefix?: string,
-}
+};
 
 // Based on reading the React.Children implementation. TODO: type this somewhere?
 type ReactNode = string | number | ReactElement;
@@ -41,8 +46,27 @@ function flattenTopLevelChildren(children: mixed): FlatReactChildren {
     return toArray(children);
   }
   const element = ((children: any): ReactElement);
-  if (element.type !== REACT_FRAGMENT_TYPE)
-}
+  if (element.type !== REACT_FRAGMENT_TYPE) {
+    return [element];
+  }
+  const fragmentChildren = element.props.children;
+  if (!React.isValidElement(fragmentChildren)) {
+    return toArray(fragmentChildren);
+  }
+  const fragmentChildElement = ((fragmentChildren: any): ReactElement);
+  return [fragmentChildElement];
+}:
+
+type Frame = {
+  type: mixed,
+  domNamespace: string,
+  children: FlatReactChildren,
+  fallbackFrame?: Frame,
+  childIndex: number,
+  context: Object,
+  footer: string,
+  ...
+};
 
 class ReactDOMServerRenderer {
   threadID: ThreadID;
@@ -68,5 +92,20 @@ class ReactDOMServerRenderer {
     options?: ServerOptions,
   ) {
     const flatChildren = flattenTopLevelChildren(children);
+
+    const topFrame: Frame = {
+      type: null,
+      // Assume all trees start in the HTML namespace (not totally true, but
+      // this is what we did historically)
+      domNamespace: Namespaces.html,
+      children: flatChildren,
+      childIndex: 0,
+      context: emptyObject,
+      footer: ''
+    };
+    if (__DEV__) {
+      ((topFrame: any): FrameDev).debugElementStack = [];
+    }
+    this.threadID = allocThreadID();
   }
 }

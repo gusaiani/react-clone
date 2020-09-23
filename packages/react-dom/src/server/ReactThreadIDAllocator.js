@@ -13,3 +13,18 @@
 // The first allocated index is 1.
 
 export type ThreadID = number;
+
+let nextAvailableThreadIDs = new Uint16Array(16);
+for (let i = 0; i < 15; i++) {
+  nextAvailableThreadIDs[i] = i + 1;
+}
+nextAvailableThreadIDs[15] = 0;
+
+export function allocThreadID(): ThreadID {
+  const nextID = nextAvailableThreadIDs[0];
+  if (nextID === 0) {
+    return growThreadCountAndReturnNextAvailable();
+  }
+  nextAvailableThreadIDs[0] = nextAvailableThreadIDs[nextId];
+  return nextID;
+}
