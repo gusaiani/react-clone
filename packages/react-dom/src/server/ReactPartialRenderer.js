@@ -20,7 +20,7 @@ import {
   REACT_FRAGMENT_TYPE,
 } from 'shared/ReactSymbols';
 
-import {allocThreadID} from './ReactThreadIDAllocator';
+import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import {
   Namespaces,
 } from '../shared/DOMNamespaces';
@@ -107,5 +107,23 @@ class ReactDOMServerRenderer {
       ((topFrame: any): FrameDev).debugElementStack = [];
     }
     this.threadID = allocThreadID();
-  }
+    this.stack = [topFrame];
+    this.exhausted = false;
+    this.currentSelectValue = null;
+    this.previousWasTextNode = false;
+    this.makeStaticMarkup = makeStaticMarkup;
+    this.suspenseDepth = 0;
+
+    // Context (new API)
+    this.contextIndex = -1;
+    this.contextStack = [];
+    this.contextValueStack = [];
+
+    // useOpaqueIdentifier ID
+    this.uniqueID = 0;
+    this.identifierPrefix = (options && options.identifierPrefix) || '';
+
+    if (__DEV__) {
+      this.contextProviderStack = [];
+    }
 }
