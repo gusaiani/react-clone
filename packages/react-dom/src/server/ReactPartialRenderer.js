@@ -83,7 +83,7 @@ class ReactDOMServerRenderer {
   contextValueStack: Array<any>;
   contextProviderStack: ?Array<ReactProvider<any>>; // DEV-only
 
-  uniqueId: number;
+  uniqueID: number;
   identifierPrefix: string;
 
   constructor(
@@ -101,7 +101,7 @@ class ReactDOMServerRenderer {
       children: flatChildren,
       childIndex: 0,
       context: emptyObject,
-      footer: ''
+      footer: '',
     };
     if (__DEV__) {
       ((topFrame: any): FrameDev).debugElementStack = [];
@@ -126,4 +126,51 @@ class ReactDOMServerRenderer {
     if (__DEV__) {
       this.contextProviderStack = [];
     }
+  }
+
+  destroy() {
+    if (!this.exhausted) {
+      this.exhausted = true;
+      this.clearProviders();
+      freeThreadID(this.threadID);
+    }
+  }
+
+  /**
+   * Note: We use just two stacks regardless of how many context providers you have.
+   * Providers are always popped in the reverse order to how they were pushed
+   * so we always know on the way down which provider you'll encounter next on the way up.
+   * On the way down, we push the current provider, and its context value *before*
+   * we mutated it, onto the stacks. Therefore, on the way up, we always know which
+   * provider needs to be "restored" to which value.
+   * https://github.com/facebook/react/pull/12985#issuecomment-396301248
+   */
+
+  pushProvider<T>(provider: ReactProvider<T>): void {
+    const index = ++this.contextIndex;
+    const context: ReactContext<any> = provider.type._context;
+    const threadID = this.threadID;
+    validateContextBounds(context, threadID);
+    const previousValue = context[threadID];
+
+    // Remember which value to restore this context to on our way up.
+    this.contextStack[index] = context;
+    this.contextValueStack[index] = previousValue;
+    if (__DEV__) {
+      // Only used for push/pop mismatch warnings.
+      (this.contextProviderStack: any)[index] = provider;
+    }
+
+    // Mutate the current value.
+    context[threadID] = provider.props.value;
+  }
+
+  clearProviders(): void {
+    // Restore any remaining providers on the stack to previous values
+    for (let index = this.contextIndex; index >= 0; index--) {
+      const context: ReactContext<any> = this.contextStack[index];
+      const previousValue = this.contextValueStack[index];
+      context[this.threadID] = previousValue;
+    }
+  }
 }
