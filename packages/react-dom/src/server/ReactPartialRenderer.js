@@ -15,12 +15,16 @@ import type {ReactProvider, ReactContext} from 'shared/ReactTypes';
 import * as React from 'react';
 import invariant from 'shared/invariant';
 import getComponentName from 'shared/getComponentName';
+import ReactSharedInternals from 'shared/ReactSharedInternals';
 
 import {
   REACT_FRAGMENT_TYPE,
 } from 'shared/ReactSymbols';
 
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
+import {
+  setCurrentPartialRenderer
+} from './ReactPartialRendererHooks';
 import {
   Namespaces,
 } from '../shared/DOMNamespaces';
@@ -34,6 +38,8 @@ type ReactNode = string | number | ReactElement;
 type FlatReactChildren = Array<null | ReactNode>;
 type toArrayType = (children: mixed) => FlatReactChildren;
 const toArray = ((React.Children.toArray: any): toArrayType);
+
+const ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
 
 type Frame = {
   type: mixed,
@@ -172,5 +178,15 @@ class ReactDOMServerRenderer {
       const previousValue = this.contextValueStack[index];
       context[this.threadID] = previousValue;
     }
+  }
+
+  read(bytes: number): string | null {
+    if (this.exhausted) {
+      return null;
+    }
+
+    const prevPartialRenderer = currentPartialRenderer;
+    setCurrentPartialRenderer(this);
+    const prevDispatcher = ReactCurrentDispatcher.current;
   }
 }

@@ -7,6 +7,8 @@
  * @flow
  */
 
+import type PartialRenderer from './ReactPartialRenderer';
+
 type BasicStateAction<S> = (S => S) | S;
 type Dispatch<A> = A => void;
 
@@ -27,4 +29,9 @@ export function useState<S>(
   return useReducer(
     basicStateReducer,
   )
+}
+
+export let currentPartialRenderer: PartialRenderer = (null: any);
+export function setCurrentPartialRenderer(renderer: PartialRenderer) {
+  currentPartialRenderer = renderer;
 }
