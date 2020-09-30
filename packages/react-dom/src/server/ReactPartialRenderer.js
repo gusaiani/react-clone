@@ -16,6 +16,9 @@ import * as React from 'react';
 import invariant from 'shared/invariant';
 import getComponentName from 'shared/getComponentName';
 import ReactSharedInternals from 'shared/ReactSharedInternals';
+import {
+  enableSuspenseServerRenderer,
+} from 'shared/ReactFeatureFlags';
 
 import {
   REACT_FRAGMENT_TYPE,
@@ -188,5 +191,76 @@ class ReactDOMServerRenderer {
     const prevPartialRenderer = currentPartialRenderer;
     setCurrentPartialRenderer(this);
     const prevDispatcher = ReactCurrentDispatcher.current;
+    ReactCurrentDispatcher.current = Dispatcher;
+    try {
+      // Markup generated within <Suspense> ends up buffered until we know
+      // nothing in that boundary suspended
+      const out = [''];
+      let suspended = false;
+      while (out[0].length < bytes) {
+        if (this.stack.length === 0) {
+          this.exhausted = true;
+          freeThreadID = true;
+          break;
+        }
+        const frame: Frame = this.stack[this.stack.length - 1];
+        if (suspended || frame.childIndex >= frame.children.length) {
+          const footer = frame.footer;
+          if (footer !== '') {
+            this.previousWasTextNode = false;
+          }
+          this.stack.pop();
+          if (frame.type === 'select') {
+            this.currentSelectValue = null;
+          } else if (
+            frame.type != null &&
+            frame.type.type != null &&
+            frame.type.type.$$typeof === REACT_PROVIDER_TYPE
+          ) {
+            const provider: ReactProvider<any> = (frame.type: any);
+            this.popProvider(provider);
+          } else if (frame.type === REACT_SUSPENSE_TYPE) {
+            this.suspenseDepth--;
+            const buffered = out.pop();
+
+            if (suspended) {
+              suspended = false;
+              // If rendering was suspended at this boundary, render the fallbackFrame
+              const fallbackFrame = frame.fallbackFrame;
+              invariant(
+                fallbackFrame,
+                'ReactDOMServer did not find an internal fallback frame for Suspense. ' +
+                  'This is a bug in React. Please file an issue.',
+              );
+              this.stack.push(fallbackFrame);
+              out[this.suspenseDepth] += '<!--$!-->';
+              // Skip flushing output since we're switching to the fallback
+              continue;
+            } else {
+              out[this.suspenseDepth] += buffered;
+            }
+          }
+
+          // Flush output
+          out[this.suspenseDepth] += footer;
+          continue;
+        }
+        const child = frame.children[frame.childIndex++];
+
+        let outBuffer = '';
+        if (__DEV__) {
+          pushCurrentDebugStack(this.stack);
+          // We're starting work on this frame, so reset its inner stack.
+          ((frame: any): FrameDev).debugElementStack.length = 0;
+        }
+        try {
+          outBuffer += this.render(child, frame.context, frame.domNamespace);
+        } catch (err) {
+          if (err!= null && typeof err.then === 'function') {
+            if (enableSuspenseServerRenderer)
+          }
+        }
+      }
+    }
   }
 }
