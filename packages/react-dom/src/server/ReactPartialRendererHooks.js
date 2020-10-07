@@ -7,6 +7,8 @@
  * @flow
  */
 
+import type {Dispatcher as DispatcherType} from 'react-reconciler/src/ReactInternalTypes';
+
 import type PartialRenderer from './ReactPartialRenderer';
 
 type BasicStateAction<S> = (S => S) | S;

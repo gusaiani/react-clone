@@ -26,7 +26,8 @@ import {
 
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import {
-  setCurrentPartialRenderer
+  Dispatcher,
+  setCurrentPartialRenderer,
 } from './ReactPartialRendererHooks';
 import {
   Namespaces,
@@ -42,7 +43,34 @@ type FlatReactChildren = Array<null | ReactNode>;
 type toArrayType = (children: mixed) => FlatReactChildren;
 const toArray = ((React.Children.toArray: any): toArrayType);
 
+// This is only used in DEV.
+// Each entry is `this.stack` from a currently executing renderer instance.
+// (There may be more than one because ReactDOMServer is reentrant).
+// Each stack is an array of frames which may contain nested stacks of elements.
+const currentDebugStacks = [];
+
 const ReactCurrentDispatcher = ReactSharedInternals.ReactCurrentDispatcher;
+let ReactDebugCurrentFrame;
+let prevGetCurrentStackImpl = null;
+let getCurrentServerStackImpl = () => '';
+let describeStackFrame = element => '';
+
+let popCurrentDebugStack = () => {};
+
+if (__DEV__) {
+  ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+
+  popCurrentDebugStack = function() {
+    currentDebugStacks.pop();
+
+    if (currentDebugStacks.length === 0) {
+      // We are exiting the server renderer.
+      // Restore the previous (e.g. client) global stack implementation.
+      ReactDebugCurrentFrame.getCurrentStack = prevGetCurrentStackImpl;
+      prevGetCurrentStackImpl = null;
+    }
+  };
+}
 
 type Frame = {
   type: mixed,
@@ -257,10 +285,36 @@ class ReactDOMServerRenderer {
           outBuffer += this.render(child, frame.context, frame.domNamespace);
         } catch (err) {
           if (err!= null && typeof err.then === 'function') {
-            if (enableSuspenseServerRenderer)
+            if (enableSuspenseServerRenderer) {
+              invariant(
+                this.suspenseDepth > 0,
+                // TODO: include component name. This is a bit tricky with current factoring.
+                'A React component suspended while rendering, but no fallback UI was specified.\n' +
+                  '\n' +
+                  'Add a <Suspense fallback=...> component higher in the tree to ' +
+                  'provide a loading indicator or placeholder to display.',
+              );
+              suspended = true;
+            } else {
+              invariant(false, 'ReactDOMServer does not yet support Suspense.');
+            }
+          } else {
+            throw err;
+          }
+        } finally {
+          if (__DEV__) {
+            popCurrentDebugStack();
           }
         }
+        if (out.length <= this.suspenseDepth) {
+          out.push('');
+        }
+        out[this.suspenseDepth] += outBuffer;
       }
+      return out[0];
+    } finally {
+      ReactCurrentDispatcher.current = prevDispatcher;
+      setCurrentPartialrenderer(prevPartialRenderer);
     }
   }
 }
