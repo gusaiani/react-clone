@@ -26,6 +26,7 @@ import {
 
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import {
+  resetHooksState,
   Dispatcher,
   setCurrentPartialRenderer,
 } from './ReactPartialRendererHooks';
@@ -315,6 +316,7 @@ class ReactDOMServerRenderer {
     } finally {
       ReactCurrentDispatcher.current = prevDispatcher;
       setCurrentPartialrenderer(prevPartialRenderer);
+      resetHooksState();
     }
   }
 }
