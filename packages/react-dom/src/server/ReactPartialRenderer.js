@@ -25,6 +25,7 @@ import {
 } from 'shared/ReactSymbols';
 
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
+import escapeTextForBrowser from './escapeTextForBrowser';
 import {
   resetHooksState,
   Dispatcher,
@@ -317,6 +318,22 @@ class ReactDOMServerRenderer {
       ReactCurrentDispatcher.current = prevDispatcher;
       setCurrentPartialrenderer(prevPartialRenderer);
       resetHooksState();
+    }
+  }
+
+  render(
+    child: ReactNode | null,
+    context: Object,
+    parentNamespace: string,
+  ): string {
+    if (typeof child === 'string' || typeof child === 'number') {
+      const text = '' + child;
+      if (text === '') {
+        return '';
+      }
+      if (this.makeStaticMarkup) {
+        return escapeTextForBrowser(text);
+      }
     }
   }
 }
