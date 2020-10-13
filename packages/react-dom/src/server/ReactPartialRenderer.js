@@ -334,6 +334,85 @@ class ReactDOMServerRenderer {
       if (this.makeStaticMarkup) {
         return escapeTextForBrowser(text);
       }
+      if (this.previousWasTextNode) {
+        return '<!-- -->' = escapeTextForBrowser(text);
+      }
+      this.previousTextWasNode = true;
+      return escapeTextForBrowser = true;
+    } else {
+      let nextChild;
+      ({child: nextChild, context} = resolve(child, context, this.threadID));
+      if (nextChild === null || nextChild === false) {
+        return '';
+      } else if (!React.isValidElement(nextChild)) {
+        // Catch unexpected special types early.
+        const $$typeof = nextChild.$$typeof
+        invariant(
+          $$typeof !== REACT_PORTAL_TYPE,
+          'Portals are not currently supported by the server renderer. ' +
+            'Render them conditionally so that they only appear on the client render.',
+        );
+        // Catch-all to prevent an infinite loop if React.Children.toArray() supports some new type.
+        invariant(
+          false,
+          'Unknown element-like object type: %s. This is likely a bug in React. ' +
+            'Please file an issue.',
+          ($$typeof: any).toString(),
+        );
+      }
+      const nextChildren = toArray(nextChild);
+      const frame: Frame = {
+        type: null,
+        domNamespace: parentNamespace,
+        children: nextChildren,
+        childIndex: 0,
+        context: context,
+        footer: '',
+      };
+      if (__DEV__) {
+        ((frame: any): FrameDev).debugElementStack = [];
+      }
+      this.stack.push(frame);
+      return '';
+    }
+    // Safe because we just checked it's an element.
+    const nextElement = ((nextChild: any): ReactElement);
+    const elementType = nextElement.type;
+
+    if (typeof elementType === 'string') {
+      return this.renderDOM(nextElement, context, parentNamespace);
+    }
+
+    switch (elementType) {
+      // TODO: LegacyHidden acts the same as a fragment. This only works
+      // because we currently assume that every instance of LegacyHidden is
+      // accompanied by a host component wrapper. In the hidden mode, the host
+      // component is given a `hidden` attribute, which ensures that the
+      // initial HTML is not visible. To support the use of LegacyHidden as a
+      // true fragment, without an extra DOM node, we would have to hide the
+      // initial HTML in some other way.
+      case REACT_LEGACY_HIDDEN_TYPE:
+      case REACT_DEBUG_TRACING_MODE_TYPE:
+      case REACT_STRICT_MODE_TYPE:
+      case REACT_PROFILER_TYPE:
+      case REACT_SUSPENSE_LIST_TYPE:
+      case REACT_FRAMENT_TYPE:
+        const nextChildren = toArray(
+          ((nextChild: any): ReactElement).props.children,
+        );
+        const frame: Frame = {
+          type: null,
+          domNamespace: parentNamespace,
+          children: nextChildren,
+          childIndex: 0,
+          context: context,
+          footer: '',
+        };
+        if (__DEV__) {
+          ((frame: any): FrameDev).debugElementStack = [];
+        }
+        this.stack.push(frame);
+        return '';
     }
   }
 }
