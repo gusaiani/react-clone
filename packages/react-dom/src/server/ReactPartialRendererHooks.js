@@ -32,6 +32,46 @@ let isInHookUserCodeInDev = false;
 // In DEV, this is the name of the curretly executing primitive hook
 let currentHookNameInDev: ?string;
 
+export function prepareToUseHooks(componentIdentity: Object): void {
+  currentlyRenderingComponent = componentIdentity;
+  if (__DEV__) {
+    isInHookUserCodeInDev = false;
+  }
+
+  // The following should have already been reset
+  // didScheduleRenderPhaseUpdate = false;
+  // firstWorkInProgressHook = null;
+  // numberOfReRenders = 0;
+  // renderPhaseUpdates = null;
+  // workInProgressHook = null;
+}
+
+export function finishHooks(
+  Component: any,
+  props: any,
+  children: any,
+  refOrContext: any,
+): any {
+  // This must be called after every function component to prevent hooks from
+  // being used in classes.
+
+  while (didScheduleRenderPhaseUpdate) {
+    // Updates were scheduled during the render phase. They are stored in
+    // the `renderPhaseUpdates` map. Call the component again, reusing the
+    // work-in-progress hooks and applying the additional updates on top. Keep
+    // restarting until no more updates are scheduled.
+    didScheduleRenderPhaseUpdate = false;
+    numberOfReRenders += 1;
+
+    // Start over from the beginning of the list
+    workInProgressHook = null;
+
+    children = Component(props, refOrContext);
+  }
+  resetHooksState();
+  return children;
+}
+
 // Reset the internal hooks state if an error occurs while rendering a component
 export function resetHooksState(): void {
   if (__DEV__) {

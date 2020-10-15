@@ -9,3 +9,6 @@
 
 // SSR experiments
 export const enableSuspenseServerRenderer = __EXPERIMENTAL__;
+
+// Experimental Scope support.
+export const enableScopeAPI = false;

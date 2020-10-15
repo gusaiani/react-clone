@@ -18,6 +18,7 @@ import getComponentName from 'shared/getComponentName';
 import ReactSharedInternals from 'shared/ReactSharedInternals';
 import {
   enableSuspenseServerRenderer,
+  enableScopeAPI,
 } from 'shared/ReactFeatureFlags';
 
 import {
@@ -27,6 +28,8 @@ import {
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import escapeTextForBrowser from './escapeTextForBrowser';
 import {
+  prepareToUseHooks,
+  finishHooks,
   resetHooksState,
   Dispatcher,
   setCurrentPartialRenderer,
@@ -230,7 +233,7 @@ class ReactDOMServerRenderer {
       while (out[0].length < bytes) {
         if (this.stack.length === 0) {
           this.exhausted = true;
-          freeThreadID = true;
+          freeThreadID(this.threadID);
           break;
         }
         const frame: Frame = this.stack[this.stack.length - 1];
@@ -286,7 +289,7 @@ class ReactDOMServerRenderer {
         try {
           outBuffer += this.render(child, frame.context, frame.domNamespace);
         } catch (err) {
-          if (err!= null && typeof err.then === 'function') {
+          if (err != null && typeof err.then === 'function') {
             if (enableSuspenseServerRenderer) {
               invariant(
                 this.suspenseDepth > 0,
@@ -316,7 +319,7 @@ class ReactDOMServerRenderer {
       return out[0];
     } finally {
       ReactCurrentDispatcher.current = prevDispatcher;
-      setCurrentPartialrenderer(prevPartialRenderer);
+      setCurrentPartialRenderer(prevPartialRenderer);
       resetHooksState();
     }
   }
@@ -335,71 +338,33 @@ class ReactDOMServerRenderer {
         return escapeTextForBrowser(text);
       }
       if (this.previousWasTextNode) {
-        return '<!-- -->' = escapeTextForBrowser(text);
+        return '<!-- -->' + escapeTextForBrowser(text);
       }
-      this.previousTextWasNode = true;
-      return escapeTextForBrowser = true;
+      this.previousWasTextNode = true;
+      return escapeTextForBrowser(text);
     } else {
       let nextChild;
       ({child: nextChild, context} = resolve(child, context, this.threadID));
       if (nextChild === null || nextChild === false) {
         return '';
       } else if (!React.isValidElement(nextChild)) {
-        // Catch unexpected special types early.
-        const $$typeof = nextChild.$$typeof
-        invariant(
-          $$typeof !== REACT_PORTAL_TYPE,
-          'Portals are not currently supported by the server renderer. ' +
-            'Render them conditionally so that they only appear on the client render.',
-        );
-        // Catch-all to prevent an infinite loop if React.Children.toArray() supports some new type.
-        invariant(
-          false,
-          'Unknown element-like object type: %s. This is likely a bug in React. ' +
-            'Please file an issue.',
-          ($$typeof: any).toString(),
-        );
-      }
-      const nextChildren = toArray(nextChild);
-      const frame: Frame = {
-        type: null,
-        domNamespace: parentNamespace,
-        children: nextChildren,
-        childIndex: 0,
-        context: context,
-        footer: '',
-      };
-      if (__DEV__) {
-        ((frame: any): FrameDev).debugElementStack = [];
-      }
-      this.stack.push(frame);
-      return '';
-    }
-    // Safe because we just checked it's an element.
-    const nextElement = ((nextChild: any): ReactElement);
-    const elementType = nextElement.type;
-
-    if (typeof elementType === 'string') {
-      return this.renderDOM(nextElement, context, parentNamespace);
-    }
-
-    switch (elementType) {
-      // TODO: LegacyHidden acts the same as a fragment. This only works
-      // because we currently assume that every instance of LegacyHidden is
-      // accompanied by a host component wrapper. In the hidden mode, the host
-      // component is given a `hidden` attribute, which ensures that the
-      // initial HTML is not visible. To support the use of LegacyHidden as a
-      // true fragment, without an extra DOM node, we would have to hide the
-      // initial HTML in some other way.
-      case REACT_LEGACY_HIDDEN_TYPE:
-      case REACT_DEBUG_TRACING_MODE_TYPE:
-      case REACT_STRICT_MODE_TYPE:
-      case REACT_PROFILER_TYPE:
-      case REACT_SUSPENSE_LIST_TYPE:
-      case REACT_FRAMENT_TYPE:
-        const nextChildren = toArray(
-          ((nextChild: any): ReactElement).props.children,
-        );
+        if (nextChild != null && nextChild.$$typeof != null) {
+          // Catch unexpected special types early.
+          const $$typeof = nextChild.$$typeof;
+          invariant(
+            $$typeof !== REACT_PORTAL_TYPE,
+            'Portals are not currently supported by the server renderer. ' +
+              'Render them conditionally so that they only appear on the client render.',
+          );
+          // Catch-all to prevent an infinite loop if React.Children.toArray() supports some new type.
+          invariant(
+            false,
+            'Unknown element-like object type: %s. This is likely a bug in React. ' +
+              'Please file an issue.',
+            ($$typeof: any).toString(),
+          );
+        }
+        const nextChildren = toArray(nextChild);
         const frame: Frame = {
           type: null,
           domNamespace: parentNamespace,
@@ -413,6 +378,140 @@ class ReactDOMServerRenderer {
         }
         this.stack.push(frame);
         return '';
-    }
+      }
+      // Safe because we just checked it's an element.
+      const nextElement = ((nextChild: any): ReactElement);
+      const elementType = nextElement.type;
+
+      if (typeof elementType === 'string') {
+        return this.renderDOM(nextElement, context, parentNamespace);
+      }
+
+      switch (elementType) {
+        // TODO: LegacyHidden acts the same as a fragment. This only works
+        // because we currently assume that every instance of LegacyHidden is
+        // accompanied by a host component wrapper. In the hidden mode, the host
+        // component is given a `hidden` attribute, which ensures that the
+        // initial HTML is not visible. To support the use of LegacyHidden as a
+        // true fragment, without an extra DOM node, we would have to hide the
+        // initial HTML in some other way.
+        case REACT_LEGACY_HIDDEN_TYPE:
+        case REACT_DEBUG_TRACING_MODE_TYPE:
+        case REACT_STRICT_MODE_TYPE:
+        case REACT_PROFILER_TYPE:
+        case REACT_SUSPENSE_LIST_TYPE:
+        case REACT_FRAGMENT_TYPE: {
+          const nextChildren = toArray(
+            ((nextChild: any): ReactElement).props.children,
+          );
+          const frame: Frame = {
+            type: null,
+            domNamespace: parentNamespace,
+            children: nextChildren,
+            childIndex: 0,
+            context: context,
+            footer: '',
+          };
+          if (__DEV__) {
+            ((frame: any): FrameDev).debugElementStack = [];
+          }
+          this.stack.push(frame);
+          return '';
+        }
+        case REACT_SUSPENSE_TYPE: {
+          if (enableSuspenseServerRenderer) {
+            const fallback = ((nextChild: any): ReactElement).props.fallback;
+            if (fallback === undefined) {
+              // If there is no fallback, then this just behaves as a fragment.
+              const nextChildren = toArray(
+                ((nextChild: any): ReactElement).props.children,
+              );
+              const frame: Frame = {
+                type: null,
+                domNamespace: parentNamespace,
+                children: nextChildren,
+                childIndex: 0,
+                context: context,
+                footer: '',
+              };
+              if (__DEV__) {
+                ((frame: any): FrameDev).debugElementStack = [];
+              }
+              this.stack.push(frame);
+              return '';
+            }
+            const fallbackChildren = toArray(fallback);
+            const nextChildren = toArray(
+              ((nextChild: any): ReactElement).props.children,
+            );
+            const fallbackFrame: Frame = {
+              type: null,
+              domNamespace: parentNamespace,
+              children: fallbackChildren,
+              childIndex: 0,
+              context: context,
+              footer: '<!--/$-->',
+            };
+            const frame: Frame = {
+              fallbackFrame,
+              type: REACT_SUSPENSE_TYPE,
+              domNamespace: parentNamespace,
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: '<!--/$-->',
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+              ((fallbackFrame: any): FrameDev).debugElementStack = [];
+            }
+            this.stack.push(frame);
+            this.suspenseDepth++;
+            return '<!--$-->';
+          } else {
+            invariant(false, 'ReactDOMServer does not yet support Suspense.');
+          }
+        }
+        // eslint-disable-next-line-no-fallthrough
+        case REACT_SCOPE_TYPE: {
+          if (enableScopeAPI) {
+            const nextChildren = toArray(
+              ((nextChild: any): ReactElement).props.children,
+            );
+            const frame: Frame = {
+              type: null,
+              domNamespace: parentNamespace,
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: '',
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+            }
+            this.stack.push(frame);
+            return '';
+          }
+          invariant(
+            false,
+            'ReactDOMServer does not yet support scope components.',
+          );
+        }
+        // eslint-disable-next-line-no-fallthrough
+        default:
+          break;
+      }
+      if (typeof elementType === 'object' && elementType !== null) {
+        switch (elementType.$$typeof) {
+          case REACT_FORWARD_REF_TYPE: {
+            const element: ReactElement = ((nextChild: any): ReactElement)
+            let nextChildren;
+            const componentIdentity = {};
+            prepareToUseHooks(componentIdentity);
+            nextChildren = elementType.render(element.props, element.ref);
+            nextChildren = finishHooks
+          }
+        }
+      }
   }
 }
