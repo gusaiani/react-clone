@@ -18,6 +18,7 @@ import getComponentName from 'shared/getComponentName';
 import ReactSharedInternals from 'shared/ReactSharedInternals';
 import {
   enableSuspenseServerRenderer,
+  enableFundamentalAPI,
   enableScopeAPI,
 } from 'shared/ReactFeatureFlags';
 
@@ -25,6 +26,9 @@ import {
   REACT_FRAGMENT_TYPE,
 } from 'shared/ReactSymbols';
 
+import {
+  validateContextBounds
+} from './ReactPartialRendererContext';
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import escapeTextForBrowser from './escapeTextForBrowser';
 import {
@@ -509,9 +513,155 @@ class ReactDOMServerRenderer {
             const componentIdentity = {};
             prepareToUseHooks(componentIdentity);
             nextChildren = elementType.render(element.props, element.ref);
-            nextChildren = finishHooks
+            nextChildren = finishHooks(
+              elementType.render,
+              element.props,
+              nextChildren,
+              element.ref,
+            );
+            nextChildren = toArray(nextChildren);
+            const frame: Frame = {
+              type: null,
+              domNamespace: parentNamespace
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: '',
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+            }
+            this.stack.push(frame);
+            return '';
           }
-        }
+          case REACT_MEMO_TYPE: {
+            const element: ReactElement = ((nextChild: any): ReactElement);
+            const nextChildren = [
+              React.createELement(
+                elementType.type,
+                Object.assign({ref: element.ref}, element.props)
+              ),
+            ];
+            const frame: Frame = {
+              type: null,
+              domNamespace: parentNamespace,
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: '',
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+            }
+            this.stack.push(frame);
+            return '';
+          }
+          case REACT_PROVIDER_TYPE: {
+            const provider: ReactProvider<any> = (nextChild: any);
+            const nextProps = provider.props;
+            const nextChildren = toArray(nextProps.children);
+            const frame: Frame = {
+              type: provider,
+              domNamespace: parentNamespace,
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: '',
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+            }
+
+            this.pushProvider(provider);
+
+            this.stack.push(frame);
+            return '';
+          }
+          case REACT_CONTEXT_TYPE: {
+            let reactContext = (nextChild: any).type;
+            // The logic below for Context differs depending on PROD or DEV mode. In
+            // DEV mode, we create a separate object for Context.Consumer that acts
+            // like a proxy to Context. This proxy object adds unnecessary code in PROD
+            // so we use the old behaviour. (Context.Consumer references Context) to
+            // reduce size and overhead. The separate object references context via
+            // a property called "_context", which also gives us the ability to check
+            // in DEV mode if this property exists or not and warn if it does not.
+            if (__DEV__) {
+              if ((reactContext: any)._context === undefined) {
+                // This may be because it's a Context (rather than a Consumer).
+                // Or it may be because it's older React where they're the same thing.
+                // We only want to warn if we're sure it's a new React.
+                if (reactContext !== reactContext.Consumer) {
+                  if (!hasWarnedAboutUsingContextAsConsumer) {
+                    hasWarneAboutUsingContextAsConsumer = true;
+                    console.error(
+                      'Rendering <Context> directly is not supported and will be removed in ' +
+                        'a future major release. Did you mean to render <Context.Consumer> instead?',
+                    );
+                  }
+                }
+              } else {
+                reactContext = (reactContext: any)._context;
+              }
+            }
+            const nextProps: any = (nextChild: any).props;
+            const threadID = this.threadID;
+            validateContextBounds(reactContext, threadID);
+            const nextValue = reactContext[threadID];
+
+            const nextChildren = toArray(nextProps.children(nextValue));
+            const frame: Frame = {
+              type: nextChild,
+              domNamespace: parentNamespace,
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: ''
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+            }
+            this.stack.push(frame);
+            return '';
+          }
+          // eslint-disable-next-line-no-fallthrough
+          case REACT_FUNDAMENTAL_TYPE:
+            if (enableFundamentalAPI) {
+              const fundamentalImpl = elementType.impl;
+              const open = fundamentalImpl.getServerSideString(
+                null,
+                nextElement.props,
+              );
+              const getServerSideStringClose =
+                fundamentalImpl.getServerSideStringClose;
+              const close =
+                getServerSideStringClose !== undefined
+                  ? getServerSideStringClose(null, nextElement.props)
+                  : '',
+              const nextChildren =
+                fundamentalImpl.reconcileChildren !== false
+                  ? toArray((nextChild: any): ReactElement).props.children
+                  : [];
+              const frame: Frame = {
+                type: null,
+                domNamespace: parentNamespace,
+                children: nextChildren,
+                childIndex: 0,
+                context: context,
+                footer: close,
+              };
+              if (__DEV__) {
+                ((frame: any): FrameDev).debugElementStack = [];
+              }
+              this.stack.push(frame);
+              return open;
+            }
+            invariant(
+              false,
+              'ReactDOMServer does not yet support the fundamental API.',
+            );
+          }
       }
   }
+}
 }
