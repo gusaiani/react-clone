@@ -522,7 +522,7 @@ class ReactDOMServerRenderer {
             nextChildren = toArray(nextChildren);
             const frame: Frame = {
               type: null,
-              domNamespace: parentNamespace
+              domNamespace: parentNamespace,
               children: nextChildren,
               childIndex: 0,
               context: context,
@@ -537,9 +537,9 @@ class ReactDOMServerRenderer {
           case REACT_MEMO_TYPE: {
             const element: ReactElement = ((nextChild: any): ReactElement);
             const nextChildren = [
-              React.createELement(
+              React.createElement(
                 elementType.type,
-                Object.assign({ref: element.ref}, element.props)
+                Object.assign({ref: element.ref}, element.props),
               ),
             ];
             const frame: Frame = {
@@ -582,7 +582,7 @@ class ReactDOMServerRenderer {
             // The logic below for Context differs depending on PROD or DEV mode. In
             // DEV mode, we create a separate object for Context.Consumer that acts
             // like a proxy to Context. This proxy object adds unnecessary code in PROD
-            // so we use the old behaviour. (Context.Consumer references Context) to
+            // so we use the old behaviour (Context.Consumer references Context) to
             // reduce size and overhead. The separate object references context via
             // a property called "_context", which also gives us the ability to check
             // in DEV mode if this property exists or not and warn if it does not.
@@ -593,7 +593,7 @@ class ReactDOMServerRenderer {
                 // We only want to warn if we're sure it's a new React.
                 if (reactContext !== reactContext.Consumer) {
                   if (!hasWarnedAboutUsingContextAsConsumer) {
-                    hasWarneAboutUsingContextAsConsumer = true;
+                    hasWarnedAboutUsingContextAsConsumer = true;
                     console.error(
                       'Rendering <Context> directly is not supported and will be removed in ' +
                         'a future major release. Did you mean to render <Context.Consumer> instead?',
@@ -616,7 +616,7 @@ class ReactDOMServerRenderer {
               children: nextChildren,
               childIndex: 0,
               context: context,
-              footer: ''
+              footer: '',
             };
             if (__DEV__) {
               ((frame: any): FrameDev).debugElementStack = [];
@@ -625,7 +625,7 @@ class ReactDOMServerRenderer {
             return '';
           }
           // eslint-disable-next-line-no-fallthrough
-          case REACT_FUNDAMENTAL_TYPE:
+          case REACT_FUNDAMENTAL_TYPE: {
             if (enableFundamentalAPI) {
               const fundamentalImpl = elementType.impl;
               const open = fundamentalImpl.getServerSideString(
@@ -637,10 +637,10 @@ class ReactDOMServerRenderer {
               const close =
                 getServerSideStringClose !== undefined
                   ? getServerSideStringClose(null, nextElement.props)
-                  : '',
+                  : '';
               const nextChildren =
                 fundamentalImpl.reconcileChildren !== false
-                  ? toArray((nextChild: any): ReactElement).props.children
+                  ? toArray(((nextChild: any): ReactElement).props.children)
                   : [];
               const frame: Frame = {
                 type: null,
@@ -661,7 +661,67 @@ class ReactDOMServerRenderer {
               'ReactDOMServer does not yet support the fundamental API.',
             );
           }
+          // eslint-disable-next-line-no-fallthrough
+          case REACT_LAZY_TYPE: {
+            const element: ReactElement = (nextChild: any);
+            const lazyComponent: LazyComponent<any, any> = (nextChild: any)
+              .type;
+            // Attempt to initialize lazy component regardless of whether the
+            // suspense server-side renderer is enabled so synchronously
+            // resolved constructors are supported.
+            const payload = lazyComponent._payload;
+            const init = lazyComponent._init;
+            const result = init(payload);
+            const nextChildren = [
+              React.createElement(
+                result,
+                Object.assign({ref: element.ref}, element.props),
+              ),
+            ];
+            const frame: Frame = {
+              type: null,
+              domNamespace: parentNamespace,
+              children: nextChildren,
+              childIndex: 0,
+              context: context,
+              footer: '',
+            };
+            if (__DEV__) {
+              ((frame: any): FrameDev).debugElementStack = [];
+            }
+            this.stack.push(frame);
+            return '';
+          }
+        }
       }
+
+      let info = '';
+      if (__DEV__) {
+        const owner = nextElement._owner;
+        if (
+          elementType === undefined ||
+          (typeof elementType === 'object' &&
+            elementType !== null &&
+            Object.keys(elementType).length === 0)
+        ) {
+          info +=
+            ' You likely forgot to export your component from the file ' +
+            "it's defined in, or you might have mixed up default and " +
+            'named imports.';
+        }
+        const ownerName = owner ? getComponentName(owner) : null;
+        if (ownerName) {
+          info += '\n\nCheck the render method of `' + ownerName + '`.`';
+        }
+      }
+      invariant(
+        false,
+        'Element type is invalid: expected a string (for built-in ' +
+          'components) or a class/function (for composite components) ' +
+          'but got: %s.%s',
+        elementType === null ? elementType : typeof elementType,
+        info,
+      );
+    }
   }
-}
 }
