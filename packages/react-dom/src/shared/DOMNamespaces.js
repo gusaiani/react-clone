@@ -14,3 +14,15 @@ export const Namespaces = {
   mathml: MATH_NAMESPACE,
   svg: SVG_NAMESPACE,
 };
+
+// Assumes there is no parent namespace.
+export function getIntrinsicNamespace(type: string): string {
+  switch (type) {
+    case 'svg':
+      return SVG_NAMESPACE;
+    case 'math':
+      return MATH_NAMESPACE;
+    default:
+      return HTML_NAMESPACE;
+  }
+}

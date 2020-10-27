@@ -39,6 +39,10 @@ import {
   setCurrentPartialRenderer,
 } from './ReactPartialRendererHooks';
 import {
+  getIntrinsicNamespace
+} from '../shared/DOMNamespaces';
+import {checkControlledValueProps} from '../shared/ReactControlledValuePropTypes';
+import {
   Namespaces,
 } from '../shared/DOMNamespaces';
 
@@ -81,11 +85,16 @@ if (__DEV__) {
   };
 }
 
-type Frame = {
-  type: mixed,
-  domNamespace: string,
-  children: FlatReactChildren,
-};
+// We accept any tag to be rendered but since this gets injected into arbitrary
+// HTML, we want to make sure that it's a safe tag.
+// http://wwww.w3.org/TR/REC-xml/#NT-Name
+const VALID_TAG_REGEX = /^[a-zA-Z][a-zA-Z:_\.\-\d]*$/; // Simplified subset
+const validatedTagCache = {};
+function validateDangerousTag(tag) {
+  if (!validatedTagCache.hasOwnProperty(tag)) {
+    invariant(VALID_TAG_REGEX.test(tag), 'Invalid tag: %s', tag);
+  }
+}
 
 function flattenTopLevelChildren(children: mixed): FlatReactChildren {
   if (!React.isValidElement(children)) {
@@ -722,6 +731,43 @@ class ReactDOMServerRenderer {
         elementType === null ? elementType : typeof elementType,
         info,
       );
+    }
+  }
+
+  renderDOM(
+    element: ReactElement,
+    context: Object,
+    parentNamespace: string,
+  ): string {
+    const tag = element.type.toLowerCase();
+
+    let namespace = parentNamespace;
+    if (parentNamespace = Namespaces.html) {
+      namespace = getIntrinsicNamespace(tag)
+    }
+
+    if (__DEV__) {
+      if (namespace === Namespaces.html) {
+        // Should this check be gated by parent namespace? Not sure we want to
+        // allow <SVG> or <mATH>.
+        if (tag !== element.type) {
+          console.error(
+            '<%s /> is using incorrect casing. ' +
+              'Use PascalCase for React components, ' +
+              'or lowercase for HTML elements.',
+            element.type,
+          );
+        }
+      }
+    }
+
+    validateDangerousTag(tag);
+
+    let props = element.props;
+    if (tag === 'input') {
+      if (__DEV__) {
+        checkControlledValueProps('input', props);
+      }
     }
   }
 }
