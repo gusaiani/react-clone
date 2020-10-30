@@ -13,7 +13,7 @@ const hasReadOnlyValue = {
   radio: true,
   reset: true,
   submit: true,
-}
+};
 
 export function checkControlledValueProps(
   tagName: string,
@@ -32,9 +32,25 @@ export function checkControlledValueProps(
     ) {
       console.error(
         'You provided a `value` prop to a form field without an ' +
-        '`onChange` handler. This will render a read-only field. If ' +
-        'the field should be mutable use `defaultValue`. Otherwise, ' +
-        'set either `onChange` or `readOnly`.',
+          '`onChange` handler. This will render a read-only field. If ' +
+          'the field should be mutable use `defaultValue`. Otherwise, ' +
+          'set either `onChange` or `readOnly`.',
+      );
+    }
+
+    if (
+      !(
+        props.onChange ||
+        props.readOnly ||
+        props.disabled ||
+        props.checked == null
+      )
+    ) {
+      console.error(
+        'You provided a `checked` prop to a form field without an ' +
+          '`onChange` handler. This will render a read-only field. If ' +
+          'the field should be mutable use `defaultChecked`. Otherwise, ' +
+          'set either `onChange` or `readOnly`.',
       );
     }
   }

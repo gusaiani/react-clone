@@ -767,6 +767,100 @@ class ReactDOMServerRenderer {
     if (tag === 'input') {
       if (__DEV__) {
         checkControlledValueProps('input', props);
+
+        if (
+          props.checked !== undefined &&
+          props.defaultChecked !== undefined &&
+          !didWarnDefaultChecked
+        ) {
+          console.error(
+            '%s contains an input of type %s with both checked and defaultChecked props. ' +
+              'Input elements must be either controlled or uncontrolled ' +
+              '(specify either the checked prop, or the defaultChecked prop, but not ' +
+              'both). Decide between using a controlled or uncontrolled input ' +
+              'element and remove one of these props. More info: ' +
+              'https://reactjs.org/link/controlled-components',
+            'A component',
+            props.type,
+          );
+          didWarnDefaultChecked = true;
+        }
+        if (
+          props.value !== undefined &&
+          props.defaultValue !== undefined &&
+          !didWarnDefaultInputValue
+        ) {
+          console.error(
+            '%s contains an input of type %s with both value and defaultValue props. ' +
+              'Input elements must be either controlled or uncontrolled ' +
+              '(specify either the value prop, or the defaultValue prop, but not ' +
+              'both). Decide between using a controlled or uncontrolled input ' +
+              'element and remove one of these props. More info: ' +
+              'https://reactjs.org/link/controlled-components',
+            'A component',
+            props.type,
+          );
+          didWarnDefaultInputValue = true;
+        }
+      }
+
+      props = Object.assign(
+        {
+          type: undefined,
+        },
+        props,
+        {
+          defaultChecked: undefined,
+          defaultValue: undefined,
+          value: props.value != null ? props.value : props.defaultValue,
+          checked: props.checked != null ? props.checked : props.defaultChecked,
+        },
+      );
+    } else if (tag === 'textarea') {
+      if (__DEV__) {
+        checkControlledValueProps('textarea', props);
+        if (
+          props.value !== undefined &&
+          props.defaultValue !== undefined &&
+          !didWarnDefaultTextareaValue
+        ) {
+          console.error(
+            'Textarea elements must be either controlled or uncontrolled ' +
+              '(specify either the value prop, or the defaultValue prop, but not ' +
+              'both). Decide between using a controlled or uncontrolled textarea ' +
+              'and remove one of these props. More info: ' +
+              'https://reactjs.org/link/controlled-components',
+          );
+          didWarnDefaultTextareaValue = true;
+        }
+      }
+
+      let initialValue = props.value;
+      if (initialValue == null) {
+        let defaultValue = props.defaultValue;
+        // TODO (yungsters): Remove support for children content in <textarea>.
+        let textareaChildren = props.children;
+        if (textareaChildren != null) {
+          if (__DEV__) {
+            console.error(
+              'Use the `defaultValue` or `value` props instead of setting ' +
+                'children on <textarea>.',
+            );
+          }
+          invariant(
+            defaultValue === null,
+            'If you supply `defaultValue` on a <textarea>, do not pass children.',
+          );
+          if (Array.isArray(textareaChildren)) {
+            invariant(
+              textareaChildren.length <= 1,
+              '<textarea> can have at most one child.',
+            );
+            textareaChildren = textareaChildren[0][]
+          }
+
+          defaultValue = + textareaChildren;
+        }
       }
     }
   }
