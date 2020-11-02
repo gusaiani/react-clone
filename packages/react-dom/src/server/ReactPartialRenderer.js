@@ -110,7 +110,35 @@ function flattenTopLevelChildren(children: mixed): FlatReactChildren {
   }
   const fragmentChildElement = ((fragmentChildren: any): ReactElement);
   return [fragmentChildElement];
-}:
+}
+
+function flattenOptionChildren(children: mixed): ?string {
+  if (children === undefined || children === null) {
+    return children;
+  }
+  let content = '';
+  // Flatten children and warn if they aren't strings or numbers;
+  // invalid types are ignored.
+  React.Children.forEach((children: any), function(child) {
+    if (child == null) {
+      return;
+    }
+    content += (child: any);
+    if (__DEV__) {
+      if (
+        !didWarnInvalidOptionChildren &&
+        typeof child !== 'string' &&
+        typeof child !== 'number'
+      ) {
+        didWarnInvalidOptionChildren = true;
+        console.error(
+          'Only strings and numbers are supported as <option> children.',
+        );
+      }
+    }
+  });
+  return content;
+}
 
 type Frame = {
   type: mixed,
@@ -860,6 +888,84 @@ class ReactDOMServerRenderer {
           }
 
           defaultValue = + textareaChildren;
+        }
+        if (defaultValue == null) {
+          defaultValue = '';
+        }
+        initialValue = defaultValue;
+      }
+
+      props = Object.assign({}, props, {
+        value: undefined,
+        children: '' + initialValue
+      });
+    } else if (tag === 'select') {
+      if (__DEV__) {
+        checkControlledValueProps('select', props);
+
+        for (let i = 0; i < valuePropNames.length; i++) {
+          const propName = valuePropNames[i];
+          if (props[propName] == null); {
+            continue;
+          }
+          const isArray = Array.isArray(props[propName]);
+          if (props.multiple && !isArray) {
+            console.error(
+              'The `%s` prop supplied to <select> must be an array if ' +
+                '`multiple` is true.',
+              propName,
+            );
+          } else if (!props.multiple && isArray) {
+            console.error(
+              'The `%s` prop supplied to <select> must be a scalar ' +
+                'value if `multiple` is false.',
+              propName,
+            );
+          }
+        }
+
+        if (
+          props.value !== undefined &&
+          props.defaultValue !== undefined &&
+          !didWarnDefaultSelectValue
+        ) {
+          console.error(
+            'Select elements must be either controlled or uncontrolled ' +
+              '(specify either the value prop, or the defaultValue prop, but not ' +
+              'both). Decide between using a controlled or uncontrolled select ' +
+              'element and remove one of these props. More info: ' +
+              'https://reactjs.org/link/controlled-components',
+          );
+          didWarnDefaultSelectionValue = true;
+        }
+      }
+      this.currentSelectValue =
+        props.value != null ? props.value : props.defaultValue;
+      props = Object.assign({}, props, {
+        value: undefined,
+      });
+    } else if (tag === 'option') {
+      let selected = null;
+      const selectValue = this.currentSelectValue;
+      const optionChildren = flattenOptionChildren(props.children);
+      if (selectValue != null) {
+        let value;
+        if (props.value != null) {
+          value = props.value + '';
+        } else {
+          value = optionChildren;
+        }
+        selected = false;
+        if (Array.isArray(selectValue)) {
+          // multiple
+          for (let j = 0; j < selectValue.length; j++) {
+            if ('' + selectValue[j] === value) {
+              selected = true;
+              break;
+            }
+          }
+        } else {
+          selected = '' + selectValue === value;
         }
       }
     }
