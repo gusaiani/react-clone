@@ -45,6 +45,7 @@ import {checkControlledValueProps} from '../shared/ReactControlledValuePropTypes
 import {
   Namespaces,
 } from '../shared/DOMNamespaces';
+import {validateProperties as validateARIAProperties} from '../shared/ReactDOMInvalidARIAHook';
 
 export type ServerOptions = {
   identifierPrefix?: string,
@@ -68,10 +69,15 @@ let prevGetCurrentStackImpl = null;
 let getCurrentServerStackImpl = () => '';
 let describeStackFrame = element => '';
 
+let validatePropertiesInDevelopment = (type, props) => {};
 let popCurrentDebugStack = () => {};
 
 if (__DEV__) {
   ReactDebugCurrentFrame = ReactSharedInternals.ReactDebugCurrentFrame;
+
+  validatePropertiesInDevelopment = function(type, props) {
+    validateARIAProperties(type, props);
+  }
 
   popCurrentDebugStack = function() {
     currentDebugStacks.pop();
@@ -967,7 +973,23 @@ class ReactDOMServerRenderer {
         } else {
           selected = '' + selectValue === value;
         }
+
+        props = Object.assign(
+          {
+            selected: undefined,
+            children: undefined,
+          },
+          props,
+          {
+            selected: selected,
+            children: optionChildren
+          },
+        );
       }
+    }
+
+    if (__DEV__) {
+      validatePropertiesInDevelopment(tag, props);
     }
   }
 }
