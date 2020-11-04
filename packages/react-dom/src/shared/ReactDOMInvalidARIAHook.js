@@ -7,14 +7,25 @@
 
 import {ATTRIBUTE_NAME_CHAR} from './DOMProperty';
 import isCustomComponent from './isCustomComponent';
+import validAriaProperties from './validAriaProperties';
 
 const warnedProperties = {};
 const rARIA = new RegExp('^(aria)-[' + ATTRIBUTE_NAME_CHAR + ']*$');
+const rARIACamel = new RegExp('^(aria)[A-Z][' + ATTRIBUTE_NAME_CHAR + ']*$');
+
+const hasOwnProperty = Object.prototype.hasOwnProperty;
 
 function validateProperty(tagName, name) {
   if (__DEV__) {
     if (hasOwnProperty.call(warnedProperties, name) && warnedProperties[name]) {
       return true;
+    }
+
+    if (rARIACamel.test(name)) {
+      const ariaName = 'aria-' + name.slice(4).toLowerCase();
+      const correctName = validAriaProperties.hasOwnProperty(ariaName)
+        ? ariaName
+        : null;
     }
   }
 }
