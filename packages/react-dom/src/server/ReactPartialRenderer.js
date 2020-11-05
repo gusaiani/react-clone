@@ -991,5 +991,7 @@ class ReactDOMServerRenderer {
     if (__DEV__) {
       validatePropertiesInDevelopment(tag, props);
     }
+
+    assertValidProps(tag, props);
   }
 }
