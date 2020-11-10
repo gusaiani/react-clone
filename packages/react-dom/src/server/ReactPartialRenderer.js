@@ -46,6 +46,8 @@ import {
   Namespaces,
 } from '../shared/DOMNamespaces';
 import {validateProperties as validateARIAProperties} from '../shared/ReactDOMInvalidARIAHook';
+import {validateProperties as validateInputProperties} from '../shared/ReactDOMNullInputValuePropHook';
+import {validateProperties as validateUnknownProperties} from '../shared/ReactDOMUnknownPropertyHook';
 
 export type ServerOptions = {
   identifierPrefix?: string,
@@ -77,6 +79,7 @@ if (__DEV__) {
 
   validatePropertiesInDevelopment = function(type, props) {
     validateARIAProperties(type, props);
+    validateInputProperties(type, props);
   }
 
   popCurrentDebugStack = function() {
