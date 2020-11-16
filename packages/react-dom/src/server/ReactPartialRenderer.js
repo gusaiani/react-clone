@@ -45,6 +45,7 @@ import {checkControlledValueProps} from '../shared/ReactControlledValuePropTypes
 import {
   Namespaces,
 } from '../shared/DOMNamespaces';
+import assertValidProps from '../shared/assertValidProps';
 import {validateProperties as validateARIAProperties} from '../shared/ReactDOMInvalidARIAHook';
 import {validateProperties as validateInputProperties} from '../shared/ReactDOMNullInputValuePropHook';
 import {validateProperties as validateUnknownProperties} from '../shared/ReactDOMUnknownPropertyHook';
