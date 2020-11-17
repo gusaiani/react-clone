@@ -46,6 +46,7 @@ import {
   Namespaces,
 } from '../shared/DOMNamespaces';
 import assertValidProps from '../shared/assertValidProps';
+import isCustomComponentFn from '../shared/isCustomComponent';
 import {validateProperties as validateARIAProperties} from '../shared/ReactDOMInvalidARIAHook';
 import {validateProperties as validateInputProperties} from '../shared/ReactDOMNullInputValuePropHook';
 import {validateProperties as validateUnknownProperties} from '../shared/ReactDOMUnknownPropertyHook';
@@ -106,6 +107,23 @@ function validateDangerousTag(tag) {
   }
 }
 
+function createMarkupForStyles(styles): string | null {
+  let serialized = '';
+  let delimiter = '';
+  for (const styleName in styles) {
+    if (!styles.hasOwnProperty(styleName)) {
+      continue;
+    }
+    const isCustomProperty = styleName.indexOf('--') === 0;
+    const styleValue = styles[styleName];
+    if (__DEV__) {
+      if (!isCustomProperty) {
+        warnValidStyle(styleName, styleValue);
+      }
+    }
+  }
+}
+
 function flattenTopLevelChildren(children: mixed): FlatReactChildren {
   if (!React.isValidElement(children)) {
     return toArray(children);
@@ -148,6 +166,39 @@ function flattenOptionChildren(children: mixed): ?string {
     }
   });
   return content;
+}
+
+const hasOwnProperty = Object.prototype.hasOwnProperty;
+const STYLE = 'style';
+
+function createOpenTagMarkup(
+  tagVerbatim: string,
+  tagLowercase: string,
+  props: Object,
+  namespace: string,
+  makeStaticMarkup: boolean,
+  isRootElement: boolean
+): string {
+  let ret = '<' + tagVerbatim;
+
+  const isCustomComponent = isCustomComponentFn(tagLowercase, props);
+
+  for (const propKey in props) {
+    if (!hasOwnProperty.call(props, propKey)) {
+      continue;
+    }
+    let propValue = props[propKey];
+    if (propValue == null) {
+      continue;
+    }
+    let propValue = props[propKey];
+    if (propValue == null) {
+      continue;
+    }
+    if (propKey === STYLE) {
+      propValue = createMarkupForStyles(propValue);
+    }
+  }
 }
 
 type Frame = {
@@ -997,5 +1048,7 @@ class ReactDOMServerRenderer {
     }
 
     assertValidProps(tag, props);
+
+    let out = createOpenTagMarkup
   }
 }
