@@ -47,6 +47,7 @@ import {
 } from '../shared/DOMNamespaces';
 import assertValidProps from '../shared/assertValidProps';
 import isCustomComponentFn from '../shared/isCustomComponent';
+import warnValidStyle from '../shared/warnValidStyle';
 import {validateProperties as validateARIAProperties} from '../shared/ReactDOMInvalidARIAHook';
 import {validateProperties as validateInputProperties} from '../shared/ReactDOMNullInputValuePropHook';
 import {validateProperties as validateUnknownProperties} from '../shared/ReactDOMUnknownPropertyHook';
