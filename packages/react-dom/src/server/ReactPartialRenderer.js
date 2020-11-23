@@ -46,6 +46,8 @@ import {
   Namespaces,
 } from '../shared/DOMNamespaces';
 import assertValidProps from '../shared/assertValidProps';
+import dangerousStyleValue from '../shared/dangerousStyleValue';
+import hyphenateStyleName from '../shared/hyphenateStyleName';
 import isCustomComponentFn from '../shared/isCustomComponent';
 import warnValidStyle from '../shared/warnValidStyle';
 import {validateProperties as validateARIAProperties} from '../shared/ReactDOMInvalidARIAHook';
@@ -108,6 +110,16 @@ function validateDangerousTag(tag) {
   }
 }
 
+const styleNameCache = {};
+const processStyleName = function(styleName) {
+  if (styleNameCache.hasOwnProperty(styleName)) {
+    return styleNameCache[styleName];
+  }
+  const result = hyphenateStyleName(styleName);
+  styleNameCache[styleName] = result;
+  return result;
+};
+
 function createMarkupForStyles(styles): string | null {
   let serialized = '';
   let delimiter = '';
@@ -121,6 +133,13 @@ function createMarkupForStyles(styles): string | null {
       if (!isCustomProperty) {
         warnValidStyle(styleName, styleValue);
       }
+    }
+    if (styleValue != null) {
+      serialized +=
+        delimiter +
+        (isCustomProperty ? styleName : processStyleName(styleName)) +
+        ':';
+      serialized += dangerousStyleValue()
     }
   }
 }
