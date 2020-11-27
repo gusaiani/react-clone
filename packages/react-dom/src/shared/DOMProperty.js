@@ -13,3 +13,16 @@ export const ATTRIBUTE_NAME_START_CHAR =
 /*eslint-enable max-len */
 export const ATTRIBUTE_NAME_CHAR =
   ATTRIBUTE_NAME_START_CHAR + '\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040';
+
+const hasOwnProperty = Object.prototype.hasOwnProperty;
+const illegalAttributeNameCache = {};
+const validatedAttributeNameCache = {};
+
+export function isAttributeNameSafe(attributeName: string): boolean {
+  if (hasOwnProperty.call(validatedAttributeNameCache, attributeName)) {
+    return true;
+  }
+  if (hasOwnProperty.call(illegalAttributeNameCache, attributeName)) {
+    return false;
+  }
+}

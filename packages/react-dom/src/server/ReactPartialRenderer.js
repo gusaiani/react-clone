@@ -30,6 +30,9 @@ import {
   validateContextBounds
 } from './ReactPartialRendererContext';
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
+import {
+  createMarkupForCustomAttribute,
+} from './DOMMarkupOperations';
 import escapeTextForBrowser from './escapeTextForBrowser';
 import {
   prepareToUseHooks,
@@ -139,9 +142,16 @@ function createMarkupForStyles(styles): string | null {
         delimiter +
         (isCustomProperty ? styleName : processStyleName(styleName)) +
         ':';
-      serialized += dangerousStyleValue()
+      serialized += dangerousStyleValue(
+        styleName,
+        styleValue,
+        isCustomProperty,
+      );
+
+      delimiter = ';';
     }
   }
+  return serialized || null;
 }
 
 function flattenTopLevelChildren(children: mixed): FlatReactChildren {
@@ -191,6 +201,13 @@ function flattenOptionChildren(children: mixed): ?string {
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 const STYLE = 'style';
 
+const RESERVED_PROPS = {
+  children: null,
+  dangerouslySetInnerHTML: null,
+  suppressContentEditableWarning: null,
+  suppressHydrationWarning: null
+};
+
 function createOpenTagMarkup(
   tagVerbatim: string,
   tagLowercase: string,
@@ -211,12 +228,14 @@ function createOpenTagMarkup(
     if (propValue == null) {
       continue;
     }
-    let propValue = props[propKey];
-    if (propValue == null) {
-      continue;
-    }
     if (propKey === STYLE) {
       propValue = createMarkupForStyles(propValue);
+    }
+    let markup = null;
+    if (isCustomComponent) {
+      if (!RESERVED_PROPS.hasOwnProperty(propKey)) {
+        markup = createMarkupForCustomAttribute(propKey, propValue);
+      }
     }
   }
 }
