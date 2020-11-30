@@ -8,8 +8,23 @@
  */
 
 import {
-  isAttributeNameSafe
+  isAttributeNameSafe,
+  getPropertyInfo,
+  shouldIgnoreAttribute,
 } from '../shared/DOMProperty';
+import quoteAttributeValueForBrowser from './quoteAttributeValueForBrowser';
+
+/**
+ * Creates markup for a property.
+ *
+ * @param {string} name
+ * @param {*} value
+ * @return {?string} Markup string, or null if the property was invalid.
+ */
+export function createMarkupForProperty(name: string, value: mixed): string {
+  const propertyInfo = getPropertyInfo(name);
+  if (name !== 'style' && shouldIgnoreAttribute())
+}
 
 /**
  * Creates markup for a custom property.

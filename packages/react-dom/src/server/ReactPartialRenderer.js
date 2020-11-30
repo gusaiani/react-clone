@@ -32,6 +32,7 @@ import {
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import {
   createMarkupForCustomAttribute,
+  createMarkupForProperty,
 } from './DOMMarkupOperations';
 import escapeTextForBrowser from './escapeTextForBrowser';
 import {
@@ -236,6 +237,8 @@ function createOpenTagMarkup(
       if (!RESERVED_PROPS.hasOwnProperty(propKey)) {
         markup = createMarkupForCustomAttribute(propKey, propValue);
       }
+    } else {
+      markup = createMarkupForProperty(propKey, propValue);
     }
   }
 }
