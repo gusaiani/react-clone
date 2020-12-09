@@ -7,6 +7,10 @@
  * @flow strict
  */
 
+// Filter certain DOM attributes (e.g. src, href) if their values are empty strings.
+// This prevents e.g. <img src=""> from making an unnecessary HTTP request for certain browsers.
+export const enableFilterEmptyStringAttributesDOM = false;
+
 // SSR experiments
 export const enableSuspenseServerRenderer = __EXPERIMENTAL__;
 

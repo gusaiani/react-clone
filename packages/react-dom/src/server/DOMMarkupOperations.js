@@ -11,6 +11,7 @@ import {
   isAttributeNameSafe,
   getPropertyInfo,
   shouldIgnoreAttribute,
+  shouldRemoveAttribute,
 } from '../shared/DOMProperty';
 import quoteAttributeValueForBrowser from './quoteAttributeValueForBrowser';
 
@@ -23,7 +24,10 @@ import quoteAttributeValueForBrowser from './quoteAttributeValueForBrowser';
  */
 export function createMarkupForProperty(name: string, value: mixed): string {
   const propertyInfo = getPropertyInfo(name);
-  if (name !== 'style' && shouldIgnoreAttribute())
+  if (name !== 'style' && shouldIgnoreAttribute(name, propertyInfo, false)) {
+    return '';
+  }
+  if (shouldRemoveAttribute)
 }
 
 /**

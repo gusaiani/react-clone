@@ -7,6 +7,8 @@
  * @flow
  */
 
+import {enableFilterEmptyStringAttributesDOM} from 'shared/ReactFeatureFlags';
+
 export type PropertyInfo = {|
   +acceptsBooleans: boolean,
   +attributeName: string,
@@ -53,8 +55,81 @@ export function isAttributeNameSafe(attributeName: string): boolean {
 
 export function shouldIgnoreAttribute(
   name: string,
-  propertyInfo: PropertyInfo | null
-)
+  propertyInfo: PropertyInfo | null,
+  isCustomComponentTag: boolean,
+): boolean {
+  if (propertyInfo !== null) {
+    return propertyInfo.type === RESERVED;
+  }
+  if (isCustomComponentTag) {
+    return false;
+  }
+  if (
+    name.length > 2 &&
+    (name[0] === 'o' || name[0] === 'O') &&
+    (name[1] === 'n' || name[1] === 'N')
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function shouldRemoveAttributeWithWarning(
+  name: string,
+  value: mixed,
+  propertyInfo: PropertyInfo | null,
+  isCustomComponentTag: boolean,
+): boolean {
+  if (propertyInfo !== null && propertyInfo.type === RESERVED) {
+    return false;
+  }
+  switch (typeof value) {
+    case 'function':
+    // $FlowIssue symbol is perfectly valid here
+    case 'symbol': // eslint-disable-line
+      return true;
+    case 'boolean': {
+      if (isCustomComponentTag) {
+        return false;
+      }
+      if (propertyInfo !== null) {
+        return !propertyInfo.acceptsBooleans;
+      } else {
+        const prefix = name.toLowerCase().slice(0, 5);
+        return prefix !== 'data-' && prefix !== 'aria-';
+      }
+    }
+    default:
+      return false;
+  }
+}
+
+export function shouldRemoveAttribute(
+  name: string,
+  value: mixed,
+  propertyInfo: PropertyInfo | null,
+  isCustomComponentTag: boolean,
+): boolean {
+  if (value === null || typeof value === 'undefined') {
+    return true;
+  }
+  if (
+    shouldRemoveAttributeWithWarning(
+      name,
+      value,
+      propertyInfo,
+      isCustomComponentTag,
+    )
+  ) {
+    return true;
+  }
+  if (isCustomComponentTag) {
+    return false;
+  }
+  if (propertyInfo !== null) {
+    if (enableFilterEmptyStringAttributesDOM)
+  }
+}
 
 export function getPropertyInfo(name: string): PropertyInfo | null {
   return properties.hasOwnProperty(name) ? properties[name] : null;
