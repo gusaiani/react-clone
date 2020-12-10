@@ -127,8 +127,44 @@ export function shouldRemoveAttribute(
     return false;
   }
   if (propertyInfo !== null) {
-    if (enableFilterEmptyStringAttributesDOM)
+    if (enableFilterEmptyStringAttributesDOM) {
+      if (propertyInfo.removeEmptyString && value === '') {
+        if (__DEV__) {
+          if (name === 'src') {
+            console.error(
+              'An empty string ("") was passed to the %s attribute. ' +
+                'This may cause the browser to download the whole page again over the network. ' +
+                'To fix this, either do not render the element at all ' +
+                'or pass null to %s instaed of an empty string.',
+              name,
+              name,
+            );
+          } else {
+            console.error(
+              'An empty string ("") was passed to the %s attribute. ' +
+                'To fix this, either do not render the element at all ' +
+                'or pass null to %s instead of an empty string.',
+              name,
+              name,
+            );
+          }
+        }
+        return true;
+      }
+    }
+
+    switch (propertyInfo.type) {
+      case BOOLEAN:
+        return !value;
+      case OVERLOAD_BOOLEAN:
+        return value === false;
+      case NUMERIC:
+        return isNaN(value);
+      case POSITIVE_NUMERIC:
+        return isNaN(value) || (value: any) < 1;
+    }
   }
+  return false;
 }
 
 export function getPropertyInfo(name: string): PropertyInfo | null {
