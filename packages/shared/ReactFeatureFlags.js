@@ -14,6 +14,9 @@ export const enableFilterEmptyStringAttributesDOM = false;
 // SSR experiments
 export const enableSuspenseServerRenderer = __EXPERIMENTAL__;
 
+// Disable javascript: URL strings in href for XSS protection.
+export const disableJavaScriptURLs = false;
+
 // Experimental Host Component support.
 export const enableFundamentalAPI = false;
 
