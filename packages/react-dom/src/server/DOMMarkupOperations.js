@@ -8,6 +8,7 @@
  */
 
 import {
+  ROOT_ATTRIBUTE_NAME,
   isAttributeNameSafe,
   getPropertyInfo,
   shouldIgnoreAttribute,
@@ -15,6 +16,10 @@ import {
 } from '../shared/DOMProperty';
 import sanitizeURL from '../shared/sanitizeURL';
 import quoteAttributeValueForBrowser from './quoteAttributeValueForBrowser';
+
+export function createMarkupForRoot(): string {
+  return ROOT_ATTRIBUTE_NAME + '=""';
+}
 
 /**
  * Creates markup for a property.
@@ -41,8 +46,12 @@ export function createMarkupForProperty(name: string, value: mixed): string {
         value = '' + (value: any);
         sanitizeURL(value);
       }
+      return attributeName + '=' + quoteAttributeValueForBrowser
     }
+  } else if (isAttributeNameSafe(name)) {
+    return name + '=' + quoteAttributeValueForBrowser(value);
   }
+  return '';
 }
 
 /**

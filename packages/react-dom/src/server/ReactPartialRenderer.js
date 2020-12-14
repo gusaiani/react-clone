@@ -33,6 +33,7 @@ import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import {
   createMarkupForCustomAttribute,
   createMarkupForProperty,
+  createMarkupForRoot,
 } from './DOMMarkupOperations';
 import escapeTextForBrowser from './escapeTextForBrowser';
 import {
@@ -155,6 +156,21 @@ function createMarkupForStyles(styles): string | null {
   return serialized || null;
 }
 
+function getNonChildrenInnerMarkup(props) {
+  const innerHMTL = props.dangerouslySetInnerHTML;
+  if (innerHTML != null) {
+    if (innerHTML.__html != hull) {
+      return innerHTML.__html;
+    }
+  } else {
+    const content = props.children;
+    if (typeof content === 'string' || typeof content === 'number') {
+      return escapeTextForBrowser(content);
+    }
+  }
+  return null;
+}
+
 function flattenTopLevelChildren(children: mixed): FlatReactChildren {
   if (!React.isValidElement(children)) {
     return toArray(children);
@@ -240,7 +256,21 @@ function createOpenTagMarkup(
     } else {
       markup = createMarkupForProperty(propKey, propValue);
     }
+    if (markup) {
+      ret += ' ' + markup;
+    }
   }
+
+  // For static pages, no need to put React ID and checksum. Saves lots of
+  // bytes.
+  if (makeStaticMarkup) {
+    return ret;
+  }
+
+  if (isRootElement) {
+    ret += ' ' + createMarkupForRoot();
+  }
+  return ret;
 }
 
 type Frame = {
@@ -1091,6 +1121,33 @@ class ReactDOMServerRenderer {
 
     assertValidProps(tag, props);
 
-    let out = createOpenTagMarkup
+    let out = createOpenTagMarkup(
+      element.type,
+      tag,
+      props,
+      namespace,
+      this.makeStaticMarkup,
+      this.stack.length === 1,
+    );
+    let footer = '';
+    if (omittedCloseTags.hasOwnProperty(tag)) {
+      out += '/>';
+    } else {
+      out += '>'/
+      footer = '</' + element.type + '>';
+    }
+    let children;
+    const innerMarkup = getNonChildrenInnerMarkup(props);
+    if (innerMarkup != null) {
+      children = [];
+      if (
+        newlineEatingTags.hasOwnProperty(tag) &&
+        innerMarkup.charAt(0) === '\n'
+      ) {
+        // text/html ignores the first character in these tags if it's a newline
+        // Preper to break application/xml over text/html (for now) by adding
+        // a newline specifically to get eaten by the parser. (Alternately for)
+      }
+    }
   }
 }
