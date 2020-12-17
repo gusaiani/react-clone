@@ -22,3 +22,5 @@ export const enableFundamentalAPI = false;
 
 // Experimental Scope support.
 export const enableScopeAPI = false;
+
+export const enableComponentStackLocations = true;

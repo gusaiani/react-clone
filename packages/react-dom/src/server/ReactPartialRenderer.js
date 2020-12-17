@@ -15,6 +15,7 @@ import type {ReactProvider, ReactContext} from 'shared/ReactTypes';
 import * as React from 'react';
 import invariant from 'shared/invariant';
 import getComponentName from 'shared/getComponentName';
+import {describeUnknownElementTypeFrameInDEV} from 'shared/ReactComponentStackFrame';
 import ReactSharedInternals from 'shared/ReactSharedInternals';
 import {
   enableSuspenseServerRenderer,
@@ -90,7 +91,16 @@ if (__DEV__) {
   validatePropertiesInDevelopment = function(type, props) {
     validateARIAProperties(type, props);
     validateInputProperties(type, props);
+    validateUnknownProperties(type, props, null);
   }
+
+  describeStackFrame = function(element): string {
+    return describeUnknownElementTypeFrameInDEV(
+      element.type,
+      element._source,
+      null,
+    );
+  };
 
   popCurrentDebugStack = function() {
     currentDebugStacks.pop();
@@ -1145,9 +1155,36 @@ class ReactDOMServerRenderer {
         innerMarkup.charAt(0) === '\n'
       ) {
         // text/html ignores the first character in these tags if it's a newline
-        // Preper to break application/xml over text/html (for now) by adding
-        // a newline specifically to get eaten by the parser. (Alternately for)
+        // Prefer to break application/xml over text/html (for now) by adding
+        // a newline specifically to get eaten by the parser. (Alternately for
+        // textareas, replacing "^\n" with "\r\n" doesn't get eaten, and the first
+        // \r is normalized out by HTMLTextAreaElement#value.)
+        // See: <http://www.w3.org/TR/html-polyglot/#newlines-in-textarea-and-pre>
+        // See: <http://www.w3.org/TR/html5/syntax.thml#element-restrictions>
+        // See: <http://www.w3.org/TR/html5/syntax.thml#newlines>
+        // See: Parsing of "textarea" "listing" and "pre" elements
+        //  from <http://www.w3.org/TR/html5/syntax.html#parsing-main-inbody>
+        out += '\n';
       }
+      out += innerMarkup;
+    } else {
+      children = toArray(props.children);
     }
+    const frame = {
+      domNamespace: getChildNamespace(parentNamespace, element.type),
+      type: tag,
+      children,
+      childIndex: 0,
+      context: context,
+      footer: footer,
+    };
+    if (__DEV__) {
+      ((frame: any): FrameDev).debugElementStack = [];
+    }
+    this.stack.push(frame);
+    this.previousWasTextNode = false;
+    return out;
   }
 }
+
+export defalt ReactDOMServerRenderer;
