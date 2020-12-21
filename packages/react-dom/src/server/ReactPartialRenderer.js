@@ -83,6 +83,7 @@ let getCurrentServerStackImpl = () => '';
 let describeStackFrame = element => '';
 
 let validatePropertiesInDevelopment = (type, props) => {};
+let pushCurrentDebugStack = (stack: Array<Frame>) => {};
 let popCurrentDebugStack = () => {};
 
 if (__DEV__) {
@@ -92,7 +93,7 @@ if (__DEV__) {
     validateARIAProperties(type, props);
     validateInputProperties(type, props);
     validateUnknownProperties(type, props, null);
-  }
+  };
 
   describeStackFrame = function(element): string {
     return describeUnknownElementTypeFrameInDEV(
@@ -100,6 +101,29 @@ if (__DEV__) {
       element._source,
       null,
     );
+  };
+
+  pushCurrentDebugStack = function(stack: Array<Frame>) {
+    currentDebugStacks.push(stack);
+
+    if (currentDebugStacks.length === 1) {
+      // We are entering a server renderer.
+      // Remember the previous (e.g. client) global stack implementation.
+      prevGetCurrentStackImpl = ReactDebugCurrentFrame.getCurrentStack;
+      ReactDebugCurrentFrame.getCurrentStack = getCurrentServerStackImpl;
+    }
+  };
+
+  pushElementToDebugStack = function(element: ReactElement) {
+    // For the innermost executing ReactDOMServer call,
+    const stack = currentDebugStacks[currentDebugStacks.length - 1];
+    // Take the innermost executing frame (e.g. <Foo>),
+    const frame: Frame = stack[stack.length - 1];
+    // and record that it has one more element associated with it.
+    ((frame: any): FrameDev).debugElementStack.push(element);
+    // We only need this because we tail-optimize single-element
+    // children and directly handle them in an inner loop instead of
+    // creating separate frames for them.
   };
 
   popCurrentDebugStack = function() {
@@ -111,6 +135,29 @@ if (__DEV__) {
       ReactDebugCurrentFrame.getCurrentStack = prevGetCurrentStackImpl;
       prevGetCurrentStackImpl = null;
     }
+  };
+
+  getCurrentServerStackImpl = function(): string {
+    if (currentDebugStacks.length === 0) {
+      // Nothing is currently rendering.
+      return '';
+    }
+    // ReactDOMServer is reentrant so there may be multiple calls at the same time.
+    // Take the frames from the innermost call which is the last in the array.
+    const frames = currentDebugStacks[currentDebugStacks.length - 1];
+    let stack = '';
+    // Go through every frame in the stack from the innermost one.
+    for (let i = frames.length - 1; i >= 0; i--) {
+      const frame: Frame = frames[i];
+      // Every frame might have more than one debug element stack entry associated with it.
+      // This is because single-child nesting doesn't create materialized frames.
+      // Instead it would push them through `pushElementToDebugStack()`.
+      const debugElementStack = ((frame: any): FrameDev).debugElementStack;
+      for (let ii = debugElementStack.length - 1; ii >= 0; ii--) {
+        stack += describeStackFrame(debugElementStack[ii]);
+      }
+    }
+    return stack;
   };
 }
 
