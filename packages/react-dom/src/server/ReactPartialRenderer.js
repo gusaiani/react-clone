@@ -28,7 +28,7 @@ import {
 } from 'shared/ReactSymbols';
 
 import {
-  validateContextBounds
+  validateContextBounds,
 } from './ReactPartialRendererContext';
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
 import {
@@ -161,14 +161,33 @@ if (__DEV__) {
   };
 }
 
+let didWarnDefaultInputValue = false;
+let didWarnDefaultChecked = false;
+let didWarnDefaultSelectValue = false;
+let didWarnDefaultTextareaValue = false;
+let didWarnInvalidOptionChildren = false;
+const didWarnAboutNoopUpdateForComponent = {};
+const didWarnAboutBadClass = {};
+const didWarnAboutModulePatternComponent = {};
+const didWarnAboutDeprecatedWillMount = {};
+const didWarnAboutUndefinedDerivedState = {};
+const didWarnAboutUninitializedState = {};
+const valuePropNames = ['value', 'defaultValue'];
+const newlineEatingTags = {
+  listing: true,
+  pre: true,
+  textarea: true,
+};
+
 // We accept any tag to be rendered but since this gets injected into arbitrary
 // HTML, we want to make sure that it's a safe tag.
-// http://wwww.w3.org/TR/REC-xml/#NT-Name
+// http://www.w3.org/TR/REC-xml/#NT-Name
 const VALID_TAG_REGEX = /^[a-zA-Z][a-zA-Z:_\.\-\d]*$/; // Simplified subset
 const validatedTagCache = {};
 function validateDangerousTag(tag) {
   if (!validatedTagCache.hasOwnProperty(tag)) {
     invariant(VALID_TAG_REGEX.test(tag), 'Invalid tag: %s', tag);
+    validatedTagCache[tag] = true;
   }
 }
 
@@ -214,9 +233,9 @@ function createMarkupForStyles(styles): string | null {
 }
 
 function getNonChildrenInnerMarkup(props) {
-  const innerHMTL = props.dangerouslySetInnerHTML;
+  const innerHTML = props.dangerouslySetInnerHTML;
   if (innerHTML != null) {
-    if (innerHTML.__html != hull) {
+    if (innerHTML.__html != null) {
       return innerHTML.__html;
     }
   } else {
@@ -274,12 +293,11 @@ function flattenOptionChildren(children: mixed): ?string {
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 const STYLE = 'style';
-
 const RESERVED_PROPS = {
   children: null,
   dangerouslySetInnerHTML: null,
   suppressContentEditableWarning: null,
-  suppressHydrationWarning: null
+  suppressHydrationWarning: null,
 };
 
 function createOpenTagMarkup(
@@ -340,6 +358,8 @@ type Frame = {
   footer: string,
   ...
 };
+
+type FrameDev = Frame & {|debugElementStack: Array<ReactElement>|};
 
 class ReactDOMServerRenderer {
   threadID: ThreadID;
@@ -735,7 +755,7 @@ class ReactDOMServerRenderer {
       if (typeof elementType === 'object' && elementType !== null) {
         switch (elementType.$$typeof) {
           case REACT_FORWARD_REF_TYPE: {
-            const element: ReactElement = ((nextChild: any): ReactElement)
+            const element: ReactElement = ((nextChild: any): ReactElement);
             let nextChildren;
             const componentIdentity = {};
             prepareToUseHooks(componentIdentity);
@@ -938,7 +958,7 @@ class ReactDOMServerRenderer {
         }
         const ownerName = owner ? getComponentName(owner) : null;
         if (ownerName) {
-          info += '\n\nCheck the render method of `' + ownerName + '`.`';
+          info += '\n\nCheck the render method of `' + ownerName + '`.';
         }
       }
       invariant(
@@ -946,7 +966,7 @@ class ReactDOMServerRenderer {
         'Element type is invalid: expected a string (for built-in ' +
           'components) or a class/function (for composite components) ' +
           'but got: %s.%s',
-        elementType === null ? elementType : typeof elementType,
+        elementType == null ? elementType : typeof elementType,
         info,
       );
     }
@@ -960,8 +980,8 @@ class ReactDOMServerRenderer {
     const tag = element.type.toLowerCase();
 
     let namespace = parentNamespace;
-    if (parentNamespace = Namespaces.html) {
-      namespace = getIntrinsicNamespace(tag)
+    if (parentNamespace === Namespaces.html) {
+      namespace = getIntrinsicNamespace(tag);
     }
 
     if (__DEV__) {
@@ -1066,18 +1086,18 @@ class ReactDOMServerRenderer {
             );
           }
           invariant(
-            defaultValue === null,
+            defaultValue == null,
             'If you supply `defaultValue` on a <textarea>, do not pass children.',
           );
           if (Array.isArray(textareaChildren)) {
             invariant(
               textareaChildren.length <= 1,
-              '<textarea> can have at most one child.',
+              '<textarea> can only have at most one child.',
             );
-            textareaChildren = textareaChildren[0][]
+            textareaChildren = textareaChildren[0];
           }
 
-          defaultValue = + textareaChildren;
+          defaultValue = '' + textareaChildren;
         }
         if (defaultValue == null) {
           defaultValue = '';
@@ -1087,7 +1107,7 @@ class ReactDOMServerRenderer {
 
       props = Object.assign({}, props, {
         value: undefined,
-        children: '' + initialValue
+        children: '' + initialValue,
       });
     } else if (tag === 'select') {
       if (__DEV__) {
@@ -1095,7 +1115,7 @@ class ReactDOMServerRenderer {
 
         for (let i = 0; i < valuePropNames.length; i++) {
           const propName = valuePropNames[i];
-          if (props[propName] == null); {
+          if (props[propName] == null) {
             continue;
           }
           const isArray = Array.isArray(props[propName]);
@@ -1126,7 +1146,7 @@ class ReactDOMServerRenderer {
               'element and remove one of these props. More info: ' +
               'https://reactjs.org/link/controlled-components',
           );
-          didWarnDefaultSelectionValue = true;
+          didWarnDefaultSelectValue = true;
         }
       }
       this.currentSelectValue =
@@ -1166,7 +1186,7 @@ class ReactDOMServerRenderer {
           props,
           {
             selected: selected,
-            children: optionChildren
+            children: optionChildren,
           },
         );
       }
@@ -1190,7 +1210,7 @@ class ReactDOMServerRenderer {
     if (omittedCloseTags.hasOwnProperty(tag)) {
       out += '/>';
     } else {
-      out += '>'/
+      out += '>';
       footer = '</' + element.type + '>';
     }
     let children;
@@ -1207,8 +1227,8 @@ class ReactDOMServerRenderer {
         // textareas, replacing "^\n" with "\r\n" doesn't get eaten, and the first
         // \r is normalized out by HTMLTextAreaElement#value.)
         // See: <http://www.w3.org/TR/html-polyglot/#newlines-in-textarea-and-pre>
-        // See: <http://www.w3.org/TR/html5/syntax.thml#element-restrictions>
-        // See: <http://www.w3.org/TR/html5/syntax.thml#newlines>
+        // See: <http://www.w3.org/TR/html5/syntax.html#element-restrictions>
+        // See: <http://www.w3.org/TR/html5/syntax.html#newlines>
         // See: Parsing of "textarea" "listing" and "pre" elements
         //  from <http://www.w3.org/TR/html5/syntax.html#parsing-main-inbody>
         out += '\n';
