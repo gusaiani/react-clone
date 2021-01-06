@@ -232,6 +232,31 @@ function createMarkupForStyles(styles): string | null {
   return serialized || null;
 }
 
+function warnNoop(
+  publicInstance: React$Component<any, any>,
+  callerName: string,
+) {
+  if (__DEV__) {
+    const constructor = publicInstance.constructor;
+    const componentName =
+      (constructor && getComponentName(constructor)) || 'ReactClass';
+    const warningKey = componentName + '.' + callerName;
+    if (didWarnAboutNoopUpdateForComponent[warningKey]) {
+      return;
+    }
+
+    console.error(
+      '%s(...): Can only update a mounting component. ' +
+        'This usually means you called %s() outside componentWillMount() on the server. ' +
+        'This is a no-op.\n\nPlease check the code for the %s component.',
+      callerName,
+      callerName,
+      componentName,
+    );
+    didWarnAboutNoopUpdateForComponent[warningKey] = true;
+  }
+}
+
 function getNonChildrenInnerMarkup(props) {
   const innerHTML = props.dangerouslySetInnerHTML;
   if (innerHTML != null) {
@@ -306,7 +331,7 @@ function createOpenTagMarkup(
   props: Object,
   namespace: string,
   makeStaticMarkup: boolean,
-  isRootElement: boolean
+  isRootElement: boolean,
 ): string {
   let ret = '<' + tagVerbatim;
 
@@ -456,6 +481,33 @@ class ReactDOMServerRenderer {
 
     // Mutate the current value.
     context[threadID] = provider.props.value;
+  }
+
+  popProvider<T>(provider: ReactProvider<T>): void {
+    const index = this.contextIndex;
+    if (__DEV__) {
+      if (index < 0 || provider !== (this.contextProviderStack: any)[index]) {
+        console.error('Unexpected pop.');
+      }
+    }
+
+    const context: ReactContext<any> = this.contextStack[index];
+    const previousValue = this.contextValueStack[index];
+
+    // "Hide" these null assignments from Flow by using `any`
+    // because conceptually they are deletions--as long as we
+    // promise to never access values beyond `this.contextIndex`.
+    this.contextStack[index] = (null: any);
+    this.contextValueStack[index] = (null: any);
+    if (__DEV__) {
+      (this.contextProviderStack: any)[index] = (null: any);
+    }
+    this.contextIndex--;
+
+    // Restore to the previous value we stored as we were walking down.
+    // We've already verified that this context has been expanded to accomodate
+    // this thread id, so we don't need to do it again.
+    context[this.threadID] = previousValue;
   }
 
   clearProviders(): void {
