@@ -18,16 +18,33 @@ import getComponentName from 'shared/getComponentName';
 import {describeUnknownElementTypeFrameInDEV} from 'shared/ReactComponentStackFrame';
 import ReactSharedInternals from 'shared/ReactSharedInternals';
 import {
+  warnAboutDeprecatedLifecycles,
   enableSuspenseServerRenderer,
   enableFundamentalAPI,
   enableScopeAPI,
 } from 'shared/ReactFeatureFlags';
 
 import {
+  REACT_DEBUG_TRACING_MODE_TYPE,
+  REACT_FORWARD_REF_TYPE,
   REACT_FRAGMENT_TYPE,
+  REACT_STRICT_MODE_TYPE,
+  REACT_SUSPENSE_TYPE,
+  REACT_SUSPENSE_LIST_TYPE,
+  REACT_PORTAL_TYPE,
+  REACT_PROFILER_TYPE,
+  REACT_PROVIDER_TYPE,
+  REACT_CONTEXT_TYPE,
+  REACT_LAZY_TYPE,
+  REACT_MEMO_TYPE,
+  REACT_FUNDAMENTAL_TYPE,
+  REACT_SCOPE_TYPE,
+  REACT_LEGACY_HIDDEN_TYPE,
 } from 'shared/ReactSymbols';
 
 import {
+  emptyObject,
+  processContext,
   validateContextBounds,
 } from './ReactPartialRendererContext';
 import {allocThreadID, freeThreadID} from './ReactThreadIDAllocator';
@@ -45,12 +62,11 @@ import {
   setCurrentPartialRenderer,
 } from './ReactPartialRendererHooks';
 import {
-  getIntrinsicNamespace
+  Namespaces,
+  getIntrinsicNamespace,
+  getChildNamespace,
 } from '../shared/DOMNamespaces';
 import {checkControlledValueProps} from '../shared/ReactControlledValuePropTypes';
-import {
-  Namespaces,
-} from '../shared/DOMNamespaces';
 import assertValidProps from '../shared/assertValidProps';
 import dangerousStyleValue from '../shared/dangerousStyleValue';
 import hyphenateStyleName from '../shared/hyphenateStyleName';
@@ -257,6 +273,10 @@ function warnNoop(
   }
 }
 
+function shouldConstruct(Component) {
+  return Component.prototype && Component.prototype.isReactComponent;
+}
+
 function getNonChildrenInnerMarkup(props) {
   const innerHTML = props.dangerouslySetInnerHTML;
   if (innerHTML != null) {
@@ -371,6 +391,46 @@ function createOpenTagMarkup(
     ret += ' ' + createMarkupForRoot();
   }
   return ret;
+}
+
+function validateRenderResult(child, type) {
+  if (child === undefined) {
+    invariant(
+      false,
+      '%s(...): Nothing was returned from render. This usually means a ' +
+        'return statement is missing. Or, to render nothing, ' +
+        'return null.',
+      getComponentName(type) || 'Component',
+    );
+  }
+}
+
+function resolve(
+  child: mixed,
+  context: Object,
+  threadID: ThreadID,
+): {|
+  child: mixed,
+  context: Object,
+|} {
+  while (React.isValidElement(child)) {
+    // Safe because we just checked it's an element.
+    const element: ReactElement = (child: any);
+    const Component = element.type;
+    if (__DEV__) {
+      pushElementToDebugStack(element);
+    }
+    if (typeof Component !== 'function') {
+      break;
+    }
+    processChild(element, Component);
+  }
+
+  // Extra closure so queue and replace can be captured properly
+  function processChild(element, Component) {
+    const isClass = shouldConstruct(Component);
+    const publicContext = processContext
+  }
 }
 
 type Frame = {
@@ -505,7 +565,7 @@ class ReactDOMServerRenderer {
     this.contextIndex--;
 
     // Restore to the previous value we stored as we were walking down.
-    // We've already verified that this context has been expanded to accomodate
+    // We've already verified that this context has been expanded to accommodate
     // this thread id, so we don't need to do it again.
     context[this.threadID] = previousValue;
   }
@@ -1306,4 +1366,4 @@ class ReactDOMServerRenderer {
   }
 }
 
-export defalt ReactDOMServerRenderer;
+export default ReactDOMServerRenderer;
